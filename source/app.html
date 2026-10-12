@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#14532d">
+<!--WEBHEAD-->
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Dealer Desk</title>
@@ -158,6 +159,14 @@ input.bad{border-color:#d92d20}
 <!--LIBS-->
 <script>
 const TPL = __TPL_JSON__;
+/* Web build: the page is small and each heavy part loads the first time it is needed (then cached on the device by sw.js).
+   Single-file build (Dealer Desk.html): everything is already inline, so need()/asset() resolve at once. */
+const BUILD = __BUILD_JSON__;
+const _need={}, _asset={};
+const loadScript = src => new Promise((res,rej)=>{ const el=document.createElement('script'); el.src=src+'?v='+BUILD.v; el.onload=res; el.onerror=()=>{ el.remove(); rej(new Error('could not load '+src+' — check the internet connection')); }; document.head.appendChild(el); });
+function need(...groups){ return Promise.all(groups.map(g=> _need[g] = _need[g] || (BUILD.web ? BUILD.libs[g].reduce((pr,f)=>pr.then(()=>loadScript(f)),Promise.resolve()) : Promise.resolve()).catch(e=>{ delete _need[g]; throw e; }))); }
+function asset(k){ return _asset[k] = _asset[k] || (BUILD.web ? fetch(BUILD.assets[k]+'?v='+BUILD.v).then(r=>{ if(!r.ok) throw new Error('could not load '+k); return r.arrayBuffer(); }).then(b=>new Uint8Array(b)) : Promise.resolve(b64ToBytes(TPL[k]))).catch(e=>{ delete _asset[k]; throw e; }); }
+const assetURL = k => BUILD.web ? BUILD.assets[k]+'?v='+BUILD.v : null;
 /* ============ helpers ============ */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -608,9 +617,11 @@ function parseAadhaarQR(txt){
 /* OCR = tesseract.js (github.com/naptha/tesseract.js), fully embedded: the WASM core, worker and English
    data are inert <script> blocks (see build.py) joined into one Blob worker. No network, works from file:// too. */
 let _tess=null, _ocrURL=null;
-function ocrWorkerURL(){
+async function ocrWorkerURL(){
   if(_ocrURL) return _ocrURL;
-  const t=id=>document.getElementById(id).textContent;
+  const T = BUILD.web ? (f=>fetch(BUILD.ocr[f]+'?v='+BUILD.v).then(r=>{ if(!r.ok) throw new Error('text reader files missing'); return r.text(); }))
+                      : (f=>Promise.resolve(document.getElementById('ocr_'+f).textContent));
+  const parts={}; await Promise.all(['core','eng','worker'].map(async f=>{ parts[f]=await T(f); })); const t=id=>parts[id.slice(4)];
   const shim=`;(function(){var b=atob(self.__ENG),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);self.__ENG=null;var f=self.fetch;self.fetch=function(r,o){return /eng\\.traineddata/.test(String(r))?Promise.resolve(new Response(u)):f(r,o)};})();\n`;
   _ocrURL=URL.createObjectURL(new Blob([t('ocr_core'),'\n;self.__ENG="',t('ocr_eng'),'";',shim,t('ocr_worker')],{type:'text/javascript'}));
   return _ocrURL;
@@ -619,7 +630,7 @@ function ocrBar(p){ const b=$('#ocrBar'); if(!b) return; b.classList.toggle('hid
 async function ocr(img){
   if(typeof Tesseract==='undefined') throw new Error('OCR library missing');
   if(!_tess){ status('Starting the text reader (a few seconds the first time)…'); ocrBar(0.05);
-    _tess = await Tesseract.createWorker('eng',1,{workerPath:ocrWorkerURL(), workerBlobURL:false, corePath:'embedded.js', langPath:'https://embedded.local', cacheMethod:'none',
+    _tess = await Tesseract.createWorker('eng',1,{workerPath:await ocrWorkerURL(), workerBlobURL:false, corePath:'embedded.js', langPath:'https://embedded.local', cacheMethod:'none',
       logger:m=>{ if(m.status==='recognizing text') ocrBar(m.progress); }, errorHandler:()=>{}})
       .catch(e=>{ _tess=null; ocrBar(null); throw new Error((typeof WebAssembly!=='object'?'this browser is too old':'could not start')+' — use latest Chrome/Edge ('+(e&&e.message||e)+')'); }); }
   // grey, scaled so text is ~30px tall (upscale small phone crops), contrast stretched between 2nd/98th percentile
@@ -698,6 +709,7 @@ function parsePAN(t){
 async function thumb(img){ const c=toCanvas(img,1200); return c.toDataURL('image/jpeg',0.72); }
 async function scan(kind, file){
   file=file||await pickFile(); if(!file) return;
+  try{ await need('scan'); }catch(e){ status(esc(e.message)); return; }
   readForm();
   status('Reading image…');
   let img; try{ img=await loadImg(file); }catch(e){ status('Could not open that image.'); return; }
@@ -741,8 +753,8 @@ function afterGen(){
   if(navigator.canShare && navigator.canShare({files:LAST_FILES})) acts.push({label:'Share / WhatsApp',pri:1,fn:()=>navigator.share({files:LAST_FILES}).catch(()=>{})});
   toast(`${n} file${n>1?'s':''} ready${SAVE_DIR?' in your save folder':' (check Downloads)'}.`, acts.length?acts:null);
 }
-function docx(tplKey,data){
-  const zip=new PizZip(b64ToBytes(TPL[tplKey]));
+async function docx(tplKey,data){
+  await need('docx'); const zip=new PizZip(await asset(tplKey));
   const doc=new docxtemplater(zip,{paragraphLoop:true,linebreaks:true,nullGetter:()=>''});
   doc.render(data);
   return doc.getZip().generate({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
@@ -754,9 +766,9 @@ function calc(s){ const price=num(s.price); const g=num(S.gst)||5; const taxable
    pdf-lib (github.com/Hopding/pdf-lib) + Carlito Bold (OFL; same metrics as Calibri used in the original).
    Positions are PDF points measured from the top of the page (baselines), taken from the example scan. */
 async function genQuotePdf(s){
-  const {PDFDocument, rgb} = PDFLib;
-  const pdf = await PDFDocument.load(b64ToBytes(TPL.letterhead)); pdf.registerFontkit(fontkit);
-  const F = await pdf.embedFont(b64ToBytes(TPL.font), {features:{liga:false,clig:false,calt:false}}); /* full embed (subsetting drops glyphs); no ligatures (they mis-space "ti") */ const pg = pdf.getPage(0), H = pg.getHeight(), ink = rgb(0,0,0);
+  await need('pdf'); const {PDFDocument, rgb} = PDFLib;
+  const pdf = await PDFDocument.load(await asset('letterhead')); pdf.registerFontkit(fontkit);
+  const F = await pdf.embedFont(await asset('font'), {features:{liga:false,clig:false,calt:false}}); /* full embed (subsetting drops glyphs); no ligatures (they mis-space "ti") */ const pg = pdf.getPage(0), H = pg.getHeight(), ink = rgb(0,0,0);
   const W = (t,sz=11) => F.widthOfTextAtSize(String(t),sz);
   const fit = (t,maxW,sz=11) => Math.min(sz, sz*maxW/Math.max(1,W(t,sz)));
   const T = (t,x,base,sz=11) => { t=String(t??''); if(t) pg.drawText(t,{x,y:H-base,size:sz,font:F,color:ink}); };
@@ -790,7 +802,7 @@ async function genQuotePdf(s){
   if(tl.length>2) T(tl.slice(2).join(' '), 63, ys[4]+25.6+28.8, fit(tl.slice(2).join(' '),247));
   T('For '+dn, 316, ys[4]+49.4, fit('For '+dn, 560-316));
   const sig=await DB.get('kv','signature');   // an uploaded image replaces the built-in signature & stamp (cut from the owner's example)
-  if(S.pdfSign!==false){ const im=await pdf.embedPng(b64ToBytes(sig&&sig.png ? sig.png.split(',')[1] : TPL.signature)); const k=Math.min(150/im.width, 92/im.height);
+  if(S.pdfSign!==false){ const im=await pdf.embedPng(sig&&sig.png ? b64ToBytes(sig.png.split(',')[1]) : await asset('signature')); const k=Math.min(150/im.width, 92/im.height);
     pg.drawImage(im,{x:402-im.width*k/2, y:H-(ys[4]+40.4)-im.height*k/2, width:im.width*k, height:im.height*k}); }
   [['1.','Price of Unit/spare are label'],['2.','Changed without NOTICE and chargeable at prevailing at the time of delivery.'],['3.','Delivery Unit/spare will be ex-show room.'],
    ['4.','Delivery of according to the availability and against full payment by cash/Demand Draft on'],['','Any Nationalized bank payable at in favour of '+dn+'.']]
@@ -802,7 +814,7 @@ async function genQuotePdf(s){
 }
 async function genQuote(s){
   const amt1=num(s.price), amt2=num(s.item2amt); const tot=amt1+(s.item2?amt2:0);
-  const blob=docx('quotation',{date:fmtD(s.quoteDate||today()), name:U(s.name), rel:s.rel||'S/O', care_of:U(s.careOf), village:U(s.village), mandal:U(s.mandal), district:U(s.district), mobile:s.mobile||'',
+  const blob=await docx('quotation',{date:fmtD(s.quoteDate||today()), name:U(s.name), rel:s.rel||'S/O', care_of:U(s.careOf), village:U(s.village), mandal:U(s.mandal), district:U(s.district), mobile:s.mobile||'',
     hyp: (!s.hyp||U(s.hyp)==='CASH')?'NIL (CASH)':U(s.hyp), words:rupeeWords(tot,'q'),
     sno1:'1', item1:U(s.model), qty1:'1', rate1:inrQ(amt1), amt1:inrQ(amt1),
     sno2:s.item2?'2':'', item2:U(s.item2||''), qty2:s.item2?'1':'', rate2:s.item2?inrQ(amt2):'', amt2:s.item2?inrQ(amt2):'', total:inrQ(tot)});
@@ -815,7 +827,7 @@ async function genInvoice(s){
   if(!s.invoiceNo){ s.invoiceNo = S.invPrefix + S.invNext; S.invNext = (parseInt(S.invNext)||0)+1; await saveSettings(); setF('invoiceNo',s.invoiceNo); }
   if(!s.invoiceDate){ s.invoiceDate=today(); setF('invoiceDate',s.invoiceDate); }
   const c=calc(s);
-  const wb=new ExcelJS.Workbook(); await wb.xlsx.load(b64ToBytes(TPL.invoice).buffer);
+  await need('xlsx'); const wb=new ExcelJS.Workbook(); await wb.xlsx.load((await asset('invoice')).buffer);
   const ws=wb.worksheets[0];
   const set=(a,v)=>{ ws.getCell(a).value=v; };
   set('A4',U(S.dealerName)); set('A5',S.addr1); set('A6',S.addr2); set('A7','GSTIN: '+S.gstin); set('A8','Phone : '+S.phone); set('A9','E-mail: '+S.email);
@@ -844,7 +856,7 @@ async function genInvoice(s){
   return deliver(await xlsxBlob(wb), safeName(`${no}. ${s.name} ${s.model} - Tax Invoice.xlsx`));
 }
 async function genTR(s){
-  const wb=new ExcelJS.Workbook(); await wb.xlsx.load(b64ToBytes(TPL.tr).buffer);
+  await need('xlsx'); const wb=new ExcelJS.Workbook(); await wb.xlsx.load((await asset('tr')).buffer);
   const tr=wb.getWorksheet('TR FORMAT'), ck=wb.getWorksheet('CHECK LIST');
   const C=(r,val,sub)=>{ const cell=tr.getCell('C'+r); const orig=String(cell.value??''); const label=orig.trim(); val=String(val??'');
     if(label){ const lead=orig.length-orig.trimStart().length; cell.value = val + ' '.repeat(Math.max(4, Math.round(lead*0.9) - Math.round(val.length*1.6))) + label + ' ' + String(sub??''); } else cell.value=val; };
@@ -897,7 +909,7 @@ function filterRows(q){ q=q.toUpperCase(); document.querySelectorAll('#tbl tbody
 function styleSheet(ws){ ws.getRow(1).font={bold:true}; ws.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE7F5EC'}}; ws.views=[{state:'frozen',ySplit:1}]; ws.eachRow(r=>r.alignment={vertical:'top',wrapText:true}); }
 async function exportSales(){
   const sales=(await DB.all('sales')).sort((a,b)=>(a.deliveryDate||a.invoiceDate||'').localeCompare(b.deliveryDate||b.invoiceDate||''));
-  const wb=new ExcelJS.Workbook(); const ws=wb.addWorksheet('Sales Register');
+  await need('xlsx'); const wb=new ExcelJS.Workbook(); const ws=wb.addWorksheet('Sales Register');
   ws.columns=[['Date of delivery',13],['S.No',6],['Customer',26],['S/O',22],['Village',18],['Mandal',16],['District',16],['Mobile',13],['Aadhaar',16],['PAN',12],['Engine no',14],['Chassis no',22],['Mfg',8],['Model',22],['Price',12],['Hypothecation / Finance',22],['Insurance',20],['Policy no',16],['Invoice no',11],['Invoice date',12],['TR no',14],['PR no',14],['TR+PR+HSRP',16],['Due',10]].map(([h,w])=>({header:h,width:w}));
   sales.forEach((s,i)=>ws.addRow([fmtD(s.deliveryDate,'/'),i+1,s.name,(s.rel||'')+' '+(s.careOf||''),s.village,s.mandal,s.district,s.mobile,s.aadhaar,s.pan,s.engine,s.chassis,s.mfg,s.model,num(s.price)||'',s.hyp,s.insCo,s.policyNo,s.invoiceNo,fmtD(s.invoiceDate,'/'),s.trNo,s.prNo,s.hsrp,num(s.dueAmt)||'']));
   styleSheet(ws); LAST_FILES=[]; await deliver(await xlsxBlob(wb),`Sales Register ${fmtD(today(),'-')}.xlsx`); afterGen();
@@ -922,7 +934,7 @@ async function saveStock(){ document.querySelectorAll('[data-s]').forEach(el=>{ 
 async function delStock(){ if(confirm('Delete this tractor from stock?')){ await DB.del('stock',STK.id); go('stock'); } }
 async function exportStock(){
   const stock=(await DB.all('stock')).sort((a,b)=>(a.billingDate||'').localeCompare(b.billingDate||''));
-  const wb=new ExcelJS.Workbook(); const ws=wb.addWorksheet('Stock Register');
+  await need('xlsx'); const wb=new ExcelJS.Workbook(); const ws=wb.addWorksheet('Stock Register');
   ws.columns=[['S.No',6],['Billing date',12],['Rec date',12],['Invoice no',18],['Chassis no',24],['Code',12],['Mfg',10],['Eng no',12],['Model',22],['DOD',12],['Customer',26],['Status',8]].map(([h,w])=>({header:h,width:w}));
   stock.forEach((s,i)=>ws.addRow([i+1,fmtD(s.billingDate),fmtD(s.recDate),s.companyInv,s.chassis,s.code,s.mfg,s.engine,s.model,fmtD(s.dod),s.customer,s.status]));
   styleSheet(ws); LAST_FILES=[]; await deliver(await xlsxBlob(wb),`Stock Register ${fmtD(today(),'-')}.xlsx`); afterGen();
@@ -949,7 +961,7 @@ async function editCustomer(id){
 }
 async function exportCustomers(){
   const cs=(await DB.all('customers')).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  const wb=new ExcelJS.Workbook(); const ws=wb.addWorksheet('Customers');
+  await need('xlsx'); const wb=new ExcelJS.Workbook(); const ws=wb.addWorksheet('Customers');
   const cols=SECTIONS[0].f; ws.columns=cols.map(([k,l])=>({header:l,key:k,width:18}));
   cs.forEach(c=>ws.addRow(Object.fromEntries(cols.map(([k])=>[k,c[k]||'']))));
   styleSheet(ws); LAST_FILES=[]; await deliver(await xlsxBlob(wb),`Customers ${fmtD(today(),'-')}.xlsx`); afterGen();
@@ -982,7 +994,7 @@ async function genDemo(){
   const d={id:uid(), date:$('#dm_date').value||today(), model:v('model'), serial:v('serial'), village:v('village'), mandal:v('mandal'), district:v('district'), stockId:$('#dm_stock').value};
   if(!d.model||!d.village){ toast('Enter model and village'); return; }
   LAST_FILES=[];
-  const blob=docx('demo',{date:fmtD(d.date), village:d.village, mandal:d.mandal, district:d.district.replace(/\s*DISTRICT$/,''), model:d.model, serial:d.serial});
+  const blob=await docx('demo',{date:fmtD(d.date), village:d.village, mandal:d.mandal, district:d.district.replace(/\s*DISTRICT$/,''), model:d.model, serial:d.serial});
   await deliver(blob, safeName(`Demo Letter - ${d.village} - ${fmtD(d.date,'-')}.docx`));
   await DB.put('demos',d);
   if(d.stockId && $('#dm_mark').checked){ const s=await DB.get('stock',d.stockId); if(s && s.status==='IN'){ s.status='DEMO'; await DB.put('stock',s); } }
@@ -1028,7 +1040,7 @@ function drawModels(){ const Q=U($('#mfilter')?.value||'');
   const rows=S.models.map((m,i)=>[m,i]).filter(([m])=>!Q||U(m.name+' '+(m.hp||'')).includes(Q)).sort(([a],[b])=>(BRANDS.indexOf(a.brand)+1||9)-(BRANDS.indexOf(b.brand)+1||9)||(a.hp||0)-(b.hp||0));
   $('#models').innerHTML=rows.map(([m,i])=>`<div class="row" style="margin-bottom:6px">${m.cat?`<div style="flex:2;min-width:170px"><b style="font-size:13px">${esc(m.name)}</b><div class="muted">${m.hp} HP · ${m.drive}${m.ref?` · ~₹${lakh(m.ref[0])}–${lakh(m.ref[1])}`:''}</div></div>`:`<input class="up" style="flex:2;min-width:160px" value="${esc(m.name)}" placeholder="Model name" onchange="S.models[${i}].name=this.value.toUpperCase();S.models[${i}].brand=brandOf(this.value)">`}<input inputmode="decimal" style="flex:1;min-width:110px" value="${money(m.price||'')}" placeholder="Your price ₹" onchange="S.models[${i}].price=num(this.value);this.value=money(this.value)">${m.cat?'':`<button class="btn sm ghost" onclick="S.models.splice(${i},1);drawModels()">✕</button>`}</div>`).join('')
    +`<div class="actionbar" style="position:sticky;margin:8px -14px -14px;border-radius:0 0 var(--radius) var(--radius)"><button class="btn pri" onclick="saveSettings().then(()=>toast('Models & prices saved ✔'))">💾 Save models & prices</button></div>`; }
-async function drawSig(){ const s=await DB.get('kv','signature'), im=$('#sigPrev'); if(!im) return; im.style.display=''; im.src=s?s.png:'data:image/png;base64,'+TPL.signature; $('#sigDel').style.display=s?'':'none'; }
+async function drawSig(){ const s=await DB.get('kv','signature'), im=$('#sigPrev'); if(!im) return; im.style.display=''; im.src=s?s.png:(assetURL('signature')||'data:image/png;base64,'+TPL.signature); $('#sigDel').style.display=s?'':'none'; }
 async function uploadSig(){ const f=await pickFile(); if(!f) return; try{ const img=await loadImg(f); const c=toCanvas(img,900);
   await DB.put('kv',{id:'signature',png:c.toDataURL('image/png')}); drawSig(); toast('Signature & stamp saved on this device ✔'); }catch(e){ toast('Could not read that image'); } }
 async function removeSig(){ await DB.del('kv','signature'); drawSig(); }
@@ -1168,6 +1180,7 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.datas
   addEventListener('online',()=>cloudSync()); document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') cloudSync(); });
   if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
   renderNav(); go('home');
+  if(BUILD.web && 'serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')) navigator.serviceWorker.register('sw.js').catch(()=>{});
   if(CLOUD){ if(!CLOUD.user) askName(); else cloudSync(); }
 })();
 </script>

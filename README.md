@@ -14,5 +14,5 @@ and Demo Letter (.docx), plus Customer, Sales and Stock registers.
 - No customer data is stored in this repository.
 
 Developer: edit `source/app.html` (model list: `source/models.json`), then
-`cd source && npm i && python build.py && node test.js`, and copy `source/dist/Dealer Desk.html` to `index.html`.
+`cd source && npm i && python build.py && node test.js && node test-web.js`, then copy `source/dist/web/*` to the repo root.
 See `HOW TO USE.txt` for staff instructions.

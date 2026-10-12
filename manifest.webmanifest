@@ -1,0 +1,1 @@
+{"name": "Dealer Desk", "short_name": "Dealer Desk", "start_url": "./", "scope": "./", "display": "standalone", "background_color": "#f4f5f0", "theme_color": "#14532d", "icons": [{"src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png"}, {"src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png"}]}
