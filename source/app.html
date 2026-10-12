@@ -789,8 +789,8 @@ async function genQuotePdf(s){
   tl.slice(0,2).forEach((l,i)=>T(l, 63, ys[4]+25.6+i*14.4, fit(l, i?247:267)));
   if(tl.length>2) T(tl.slice(2).join(' '), 63, ys[4]+25.6+28.8, fit(tl.slice(2).join(' '),247));
   T('For '+dn, 316, ys[4]+49.4, fit('For '+dn, 560-316));
-  const sig=await DB.get('kv','signature');
-  if(sig && sig.png && S.pdfSign!==false){ const im=await pdf.embedPng(b64ToBytes(sig.png.split(',')[1])); const k=Math.min(150/im.width, 92/im.height);
+  const sig=await DB.get('kv','signature');   // an uploaded image replaces the built-in signature & stamp (cut from the owner's example)
+  if(S.pdfSign!==false){ const im=await pdf.embedPng(b64ToBytes(sig&&sig.png ? sig.png.split(',')[1] : TPL.signature)); const k=Math.min(150/im.width, 92/im.height);
     pg.drawImage(im,{x:402-im.width*k/2, y:H-(ys[4]+40.4)-im.height*k/2, width:im.width*k, height:im.height*k}); }
   [['1.','Price of Unit/spare are label'],['2.','Changed without NOTICE and chargeable at prevailing at the time of delivery.'],['3.','Delivery Unit/spare will be ex-show room.'],
    ['4.','Delivery of according to the availability and against full payment by cash/Demand Draft on'],['','Any Nationalized bank payable at in favour of '+dn+'.']]
@@ -1009,9 +1009,9 @@ VIEWS.settings = async () => {
    <div class="row" style="margin-top:8px"><input id="ifsc" placeholder="Look up IFSC (e.g. UTIB0000001)" style="max-width:260px" class="up"><button class="btn sm" onclick="ifscLookup()">Find bank</button><span id="ifscOut" class="muted"></span></div>
    <div class="row" style="margin-top:8px"><button class="btn pri" onclick="saveSt()">Save</button></div></div>
   <div class="card"><h2>Signature & stamp on PDF quotation</h2>
-   <p class="muted" style="margin-top:0">Upload a picture of your signature + stamp (PNG with clear background works best). It is kept only on this device and printed above “For ${esc(U(S.dealerName))}” on every PDF quotation.</p>
+   <p class="muted" style="margin-top:0">Printed above “For ${esc(U(S.dealerName))}” on every PDF quotation. The signature & stamp from your example quotation is built in; upload a different picture (PNG with clear background) to replace it on this device.</p>
    <div class="row"><img id="sigPrev" alt="" style="max-height:80px;max-width:220px;background:#fff;border:1px solid var(--line);border-radius:8px;display:none">
-    <button class="btn" onclick="uploadSig()">⬆ Upload signature & stamp</button><button class="btn ghost" id="sigDel" onclick="removeSig()" style="display:none">Remove</button>
+    <button class="btn" onclick="uploadSig()">⬆ Upload signature & stamp</button><button class="btn ghost" id="sigDel" onclick="removeSig()" style="display:none">Use built-in</button>
     <label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" style="width:auto;min-height:0" ${S.pdfSign!==false?'checked':''} onchange="S.pdfSign=this.checked;saveSettings()"> Print on quotation</label></div></div>
   <div class="card"><h2>Save location (PC)</h2>
    <p class="muted">By default files go to your Downloads folder. On a PC in Chrome/Edge you can choose a folder (e.g. Documents\\PowerTrac Docx\\Generated) and files will be saved there directly.</p>
@@ -1028,7 +1028,7 @@ function drawModels(){ const Q=U($('#mfilter')?.value||'');
   const rows=S.models.map((m,i)=>[m,i]).filter(([m])=>!Q||U(m.name+' '+(m.hp||'')).includes(Q)).sort(([a],[b])=>(BRANDS.indexOf(a.brand)+1||9)-(BRANDS.indexOf(b.brand)+1||9)||(a.hp||0)-(b.hp||0));
   $('#models').innerHTML=rows.map(([m,i])=>`<div class="row" style="margin-bottom:6px">${m.cat?`<div style="flex:2;min-width:170px"><b style="font-size:13px">${esc(m.name)}</b><div class="muted">${m.hp} HP · ${m.drive}${m.ref?` · ~₹${lakh(m.ref[0])}–${lakh(m.ref[1])}`:''}</div></div>`:`<input class="up" style="flex:2;min-width:160px" value="${esc(m.name)}" placeholder="Model name" onchange="S.models[${i}].name=this.value.toUpperCase();S.models[${i}].brand=brandOf(this.value)">`}<input inputmode="decimal" style="flex:1;min-width:110px" value="${money(m.price||'')}" placeholder="Your price ₹" onchange="S.models[${i}].price=num(this.value);this.value=money(this.value)">${m.cat?'':`<button class="btn sm ghost" onclick="S.models.splice(${i},1);drawModels()">✕</button>`}</div>`).join('')
    +`<div class="actionbar" style="position:sticky;margin:8px -14px -14px;border-radius:0 0 var(--radius) var(--radius)"><button class="btn pri" onclick="saveSettings().then(()=>toast('Models & prices saved ✔'))">💾 Save models & prices</button></div>`; }
-async function drawSig(){ const s=await DB.get('kv','signature'), im=$('#sigPrev'); if(!im) return; im.style.display=s?'':'none'; $('#sigDel').style.display=s?'':'none'; if(s) im.src=s.png; }
+async function drawSig(){ const s=await DB.get('kv','signature'), im=$('#sigPrev'); if(!im) return; im.style.display=''; im.src=s?s.png:'data:image/png;base64,'+TPL.signature; $('#sigDel').style.display=s?'':'none'; }
 async function uploadSig(){ const f=await pickFile(); if(!f) return; try{ const img=await loadImg(f); const c=toCanvas(img,900);
   await DB.put('kv',{id:'signature',png:c.toDataURL('image/png')}); drawSig(); toast('Signature & stamp saved on this device ✔'); }catch(e){ toast('Could not read that image'); } }
 async function removeSig(){ await DB.del('kv','signature'); drawSig(); }
