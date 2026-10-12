@@ -62,7 +62,29 @@ const exe = fs.existsSync('/opt/pw-browsers/chromium') ? {executablePath:'/opt/p
   // address parser cases
   console.log('ADDR', JSON.stringify(await p.evaluate(()=>[
     'Address: S/O: Suresh Babu, 2-45, Temple Street, Lakshmipuram, Tiruvuru, Krishna, Andhra Pradesh - 521235',
-    'Address:\nW/O Ramesh,\n1-23, Main Road,\nThorredu, PO: Thorredu,\nRajahmundry Rural, East Godavari,\nAndhra Pradesh, 533294'].map(parseAadhaarAddress))));
+    'Address:\nW/O Ramesh,\n1-23, Main Road,\nThorredu, PO: Thorredu,\nRajahmundry Rural, East Godavari,\nAndhra Pradesh, 533294',
+    'Address: S/O: Suresh Babu, 2-45, Temple Street, Near Ramalayam, VTC: Lakshmipuram, PO: Lakshmipuram, Sub District: Tiruvuru, District: Krishna, State: Andhra Pradesh, PIN Code: 521235, Mobile: 9848012345',
+    'ఎవరు చిరునామా ¥ ®\nAddres: S/0 Suresh Babu, 2-45,\nTemple Street, Lakshmipuram,\nTiruvuru, Krishria,\nAndhra Pradesh - 521 235\n2345 6789 0124'].map(parseAadhaarAddress).map(o=>Object.entries(o).map(([k,v])=>k+'='+v).join(' | '))), null, 1));
+  // reported bugs: model fills an editable price; amounts take commas; dropdown lists all options; mobile is kept
+  await p.click('nav button:has-text("New sale")'); await p.waitForTimeout(300);
+  await p.fill('[data-f="name"]','BUG CHECK'); await p.fill('[data-f="mobile"]','98480 12345');
+  await p.click('[data-f="district"]'); await p.waitForTimeout(150);
+  console.log('DISTRICT DROPDOWN items:', await p.$$eval('#combo div',d=>d.length), '| first:', await p.$$eval('#combo div',d=>d.slice(0,3).map(x=>x.textContent).join(', ')));
+  await p.fill('[data-f="district"]',''); await p.type('[data-f="district"]','ntr'); await p.waitForTimeout(150);
+  await p.click('#combo div:has-text("NTR")'); console.log('DISTRICT picked:', await p.inputValue('[data-f="district"]'));
+  await p.click('#nextBtn'); await p.click('button:has-text("Browse")'); await p.click('.mcard:has-text("FARMTRAC 60 POWERMAXX")'); await p.click('#nextBtn');
+  console.log('PRICE from model:', await p.inputValue('[data-f="price"]'), '|', await p.textContent('.pnote'));
+  await p.fill('[data-f="price"]',''); await p.type('[data-f="price"]','8,45,000'); await p.press('[data-f="price"]','Tab');
+  console.log('PRICE typed:', await p.inputValue('[data-f="price"]'), '| total shown:', await p.textContent('.calc .tot:last-child'));
+  await p.click('[data-f="hyp"]'); await p.waitForTimeout(150); console.log('BANK DROPDOWN items:', await p.$$eval('#combo div',d=>d.length));
+  await p.click('#combo div:has-text("STATE BANK")'); console.log('BANK picked:', await p.inputValue('[data-f="hyp"]'));
+  await p.click('.actionbar button:has-text("Save")'); await p.waitForTimeout(400);
+  console.log('SAVED', JSON.stringify(await p.evaluate(async()=>{ const s=(await DB.all('sales')).find(x=>x.name==='BUG CHECK'); const m=S.models.find(x=>x.name==='FARMTRAC 60 POWERMAXX'); return {mobile:s.mobile, price:s.price, district:s.district, learned:m.price}; })));
+  await p.screenshot({path:'shots/price.png'});
+  // customer edit (mobile) updates their sales
+  await p.click('nav button:has-text("Customers")'); await p.click('tr:has-text("BUG CHECK") button:has-text("Edit")');
+  await p.fill('[data-c="mobile"]','9000011111'); await p.click('#ecSave'); await p.waitForTimeout(400);
+  console.log('EDITED', await p.evaluate(async()=>(await DB.all('sales')).find(x=>x.name==='BUG CHECK').mobile));
   // remembered place: known village fills mandal / district / PIN
   await p.click('nav button:has-text("New sale")'); await p.waitForTimeout(300);
   await p.fill('[data-f="village"]','RAVIPADU'); await p.press('[data-f="village"]','Tab'); await p.waitForTimeout(200);
