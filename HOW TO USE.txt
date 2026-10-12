@@ -20,6 +20,10 @@ DAILY FLOW (one entry -> all documents) - "New sale" walks you through 5 steps:
    built-in text reader (works fully offline, nothing is sent anywhere).
    A red note under Mobile / Aadhaar / PAN / PIN means the number looks wrong.
    "Existing customer" searches customers you already saved.
+   Village / mandal / district: the Aadhaar QR or the Aadhaar BACK photo (address side)
+   fills them. A village you used before fills its mandal, district and PIN by itself.
+   Typing a PIN (when online) fills an empty mandal/district and lists its villages.
+   Set your usual district in Settings -> "Default district".
 2. Tractor: pick from stock, or "Browse" all Powertrac / Farmtrac / Digitrac models.
 3. Price & finance: price fills from Settings; the GST breakup is shown live.
    Type hypothecation bank (or CASH). Date defaults to today.

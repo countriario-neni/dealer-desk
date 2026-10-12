@@ -206,7 +206,7 @@ const DEFAULT_SETTINGS = {
   addr2:'TIRUVURU-521235, Krishna District, A.P',
   gstin:'37BSHPG6211M1ZL', phone:'9440481826,9398391992', email:'lakshmipuramsrinubabu@gmail.com',
   demoPlace:'LAKSHMIPURAM TIRUVURU MANDAL',
-  invPrefix:'24-26/', invNext:29, gst:5, hsn:'87019200',
+  invPrefix:'24-26/', invNext:29, gst:5, hsn:'87019200', defDistrict:'WEST GODAVARI',
   models:[{name:'POWERTRAC EURO 50 4WD', price:1057000},{name:'POWERTRAC EURO 439 E3', price:0}],
   banks:['AXIS BANK LIMITED','HDFC BANK LIMITED','UNION BANK OF INDIA','STATE BANK OF INDIA','ICICI BANK LIMITED','CANARA BANK','INDIAN BANK','KOTAK MAHINDRA BANK LIMITED','CASH'],
 };
@@ -234,8 +234,8 @@ const SECTIONS = [
  {id:'cust', t:'Customer', f:[
   ['name','Customer name',{up:1,full:1}],['rel','Relation',{opts:['S/O','W/O','D/O','C/O']}],['careOf','Father / Husband name',{up:1}],
   ['dob','Date of birth',{ph:'dd/mm/yyyy'}],['gender','Gender',{opts:['','MALE','FEMALE']}],['mobile','Mobile',{type:'tel'}],
-  ['house','Door number',{up:1}],['street','Street',{up:1}],['village','Village',{up:1}],['mandal','Mandal',{up:1}],
-  ['district','District',{up:1}],['pin','PIN code',{type:'tel'}],['aadhaar','Aadhaar number',{type:'tel'}],['pan','PAN number',{up:1}] ]},
+  ['house','Door number',{up:1}],['street','Street',{up:1}],['village','Village',{up:1,list:'village'}],['mandal','Mandal',{up:1,list:'mandal'}],
+  ['district','District',{up:1,list:'district'}],['pin','PIN code',{type:'tel'}],['aadhaar','Aadhaar number',{type:'tel'}],['pan','PAN number',{up:1}] ]},
  {id:'veh', t:'Tractor', f:[
   ['stockId','Pick from stock',{stock:1,full:1}],['model','Model',{up:1,list:'models'}],['engine','Engine no',{up:1}],['chassis','Chassis no',{up:1}],
   ['mfg','Mfg month & year',{ph:'01/26'}],['hsn','HSN code'] ]},
@@ -347,7 +347,7 @@ const STEPS = [
   {t:'Delivery & TR', ic:'📋', req:['deliveryDate','insCo','trNo']},
   {t:'Documents', ic:'📄', req:[]},
 ];
-const DOC_NEEDS = { quote:['name','village','model','price'], invoice:['name','village','model','engine','chassis','price'], tr:['name','model','chassis','deliveryDate'] };
+const DOC_NEEDS = { quote:['name','careOf','village','mandal','district','mobile','model','price'], invoice:['name','careOf','village','mandal','district','pin','mobile','model','engine','chassis','price'], tr:['name','careOf','house','village','mandal','district','pin','mobile','aadhaar','model','engine','chassis','deliveryDate'] };
 const FIELD_LABEL = Object.fromEntries(SECTIONS.flatMap(s=>s.f.map(([k,l])=>[k,l])));
 let STEP=0;
 VIEWS.sale = async (arg={}) => {
@@ -355,11 +355,12 @@ VIEWS.sale = async (arg={}) => {
   else if(arg.customerId){ const c=await DB.get('customers',arg.customerId); CUR=blankSale(); CUST_FIELDS.forEach(k=>CUR[k]=c[k]??''); CUR.customerId=c.id; CUR.imgs=c.imgs||{}; }
   else if(!arg.keep || !CUR) CUR = blankSale();
   STEP = arg.step ?? 0;
-  const stock = await DB.all('stock');
+  const stock = await DB.all('stock'); await loadPlaces();
   const sec = id => { const s=SECTIONS.find(x=>x.id===id); return `<div class="card"><h2>${s.t}</h2><div class="grid">${s.f.map(fieldHTML).join('')}</div></div>`; };
   $('#main').innerHTML = `
   <datalist id="dl_models">${S.models.map(m=>`<option value="${esc(m.name)}">`).join('')}</datalist>
   <datalist id="dl_banks">${S.banks.map(b=>`<option value="${esc(b)}">`).join('')}</datalist>
+  ${placeLists()}
   <div class="row" style="justify-content:space-between;margin-bottom:10px">
     <div><b id="saleTitle">${CUR.name?esc(CUR.name):'New sale'}</b> <span class="muted">${CUR.invoiceNo?'· Invoice '+esc(CUR.invoiceNo):''}</span></div>
     <div class="row"><button class="btn sm" onclick="go('sale')">＋ New</button>${CUR._saved?`<button class="btn sm ghost" onclick="deleteSale()">Delete</button>`:''}</div>
@@ -401,6 +402,7 @@ VIEWS.sale = async (arg={}) => {
     <button class="btn acc" onclick="gen('all')">Generate all</button>`;
   $('#actionbar').classList.remove('hide');
   $('#main').oninput = e=>{ const el=e.target; if(!el.dataset.f) return; el.classList.remove('hl'); if(VALID[el.dataset.f]){ clearTimeout(el._vt); el._vt=setTimeout(()=>validate(el),600); } if(el.dataset.f==='name') $('#saleTitle').textContent=el.value||'New sale'; refresh(); };
+  $('#main').onchange = e=>{ const k=e.target.dataset.f; if(k==='village'||k==='mandal') placeFill(k); if(k==='pin') pinLookup(); };
   const sb=$('#scanbox');
   sb.ondragover=e=>{ e.preventDefault(); sb.classList.add('drag'); }; sb.ondragleave=()=>sb.classList.remove('drag');
   sb.ondrop=e=>{ e.preventDefault(); sb.classList.remove('drag'); const f=e.dataTransfer.files[0]; if(f&&f.type.startsWith('image/')) scan('aadhaar',f); };
@@ -437,8 +439,28 @@ function drawDocCards(){
     return `<div class="doc"><b>${ic} ${t}</b><span class="muted">${sub}</span>${miss.length?`<span class="miss">Missing: ${esc(miss.join(', '))}</span>`:'<span class="ok">✓ Ready</span>'}<button class="btn ${miss.length?'':'pri'}" onclick="gen('${k}')">Download</button></div>`; };
   $('#docCards').innerHTML = card('quote','📄','Quotation','Word (.docx)') + card('invoice','🧾','Tax invoice','Excel (.xlsx) · '+(val('invoiceNo')||'no. '+S.invPrefix+S.invNext+' will be assigned')) + card('tr','📋','TR format + Check list','Excel (.xlsx)');
 }
+/* Places: remembered from saved customers (offline), so a known village fills its mandal, district & PIN. */
+let PLACES={village:{},mandal:{}}, PIN_VILLAGES=[];
+async function loadPlaces(){ PLACES={village:{},mandal:{}}; PIN_VILLAGES=[];
+  (await DB.all('customers')).sort((a,b)=>(a.updatedAt||0)-(b.updatedAt||0)).forEach(c=>{ const v=U(c.village), m=U(c.mandal), d=U(c.district);
+    if(v) PLACES.village[v]={mandal:m,district:d,pin:c.pin||''}; if(m&&d) PLACES.mandal[m]={district:d}; }); }
+const opts = a => [...new Set(a.filter(Boolean))].sort().map(x=>`<option value="${esc(x)}">`).join('');
+const villageList = () => `<datalist id="dl_village">${opts([...PIN_VILLAGES,...Object.keys(PLACES.village)])}</datalist>`;
+function placeLists(){ return villageList()+`<datalist id="dl_mandal">${opts([...Object.keys(PLACES.mandal),...Object.values(PLACES.village).map(x=>x.mandal)])}</datalist><datalist id="dl_district">${opts([U(S.defDistrict),...Object.values(PLACES.mandal).map(x=>x.district)])}</datalist>`; }
+const isDefDistrict = () => !val('district') || U(val('district'))===U(S.defDistrict);
+function placeFill(k){ const hit=PLACES[k][U(val(k))]; if(!hit) return;
+  if(k==='village'){ if(hit.mandal&&!val('mandal')) setF('mandal',hit.mandal); if(hit.pin&&!val('pin')) setF('pin',hit.pin); }
+  if(hit.district&&isDefDistrict()&&U(val('district'))!==hit.district) setF('district',hit.district); }
+/* Optional online helper: India Post PIN directory (only the 6-digit PIN is sent). Fills empty mandal/district, suggests villages. */
+async function pinLookup(){ const pin=val('pin'); if(!/^\d{6}$/.test(pin) || !navigator.onLine || (val('mandal') && !isDefDistrict())) return;
+  try{ const r=await fetch('https://api.postalpincode.in/pincode/'+pin); const j=(await r.json())[0]; if(j.Status!=='Success'||val('pin')!==pin) return;
+    const po=j.PostOffice||[]; const blk=po.map(x=>x.Block).find(b=>b&&b!=='NA'); const dist=po[0]&&po[0].District;
+    if(blk&&!val('mandal')) setF('mandal',U(blk)); if(dist&&isDefDistrict()) setF('district',U(dist));
+    PIN_VILLAGES=po.map(x=>U(x.Name).replace(/\s+[BSH]\.?O\.?$/,'')); $('#dl_village').outerHTML=villageList();
+    if(!val('village')&&PIN_VILLAGES.length) status(`PIN ${pin} — villages: ${esc(PIN_VILLAGES.slice(0,8).join(', '))}${PIN_VILLAGES.length>8?'…':''}. Pick one in the Village box.`);
+  }catch(e){} }
 function saleModel(m){ setF('model',m.name); if(num(m.price)) setF('price',m.price); refresh(); }
-function blankSale(){ return {id:uid(), rel:'S/O', quoteDate:today(), hsn:S.hsn, district:'WEST GODAVARI', imgs:{}, createdAt:Date.now()}; }
+function blankSale(){ return {id:uid(), rel:'S/O', quoteDate:today(), hsn:S.hsn, district:U(S.defDistrict), imgs:{}, createdAt:Date.now()}; }
 function readForm(){
   document.querySelectorAll('#main [data-f]').forEach(el=>{
     const k=el.dataset.f; let v = el.type==='checkbox'? el.checked : el.value;
@@ -470,12 +492,16 @@ async function deleteSale(){ if(!confirm('Delete this sale? (customer record is 
 async function pickCustomer(){
   const cs=(await DB.all('customers')).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
   if(!cs.length){ toast('No saved customers yet — they are added automatically when you save a sale.'); return; }
+  customerModal(c=>{ CUST_FIELDS.forEach(k=>setF(k,c[k],false)); CUR.customerId=c.id; CUR.imgs={...(c.imgs||{}),...(CUR.imgs||{})}; renderThumbs(); $('#saleTitle').textContent=c.name; toast('Loaded '+esc(c.name)); }, cs);
+}
+async function customerModal(cb, cs){
+  cs=cs||(await DB.all('customers')).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(!cs.length){ toast('No saved customers yet'); return; }
   modal('Pick existing customer', `<input id="cq" placeholder="Search name, mobile, village, Aadhaar…" autocomplete="off"><div class="list" id="cl" style="margin-top:8px"></div>`);
   const draw=q=>{ const Q=U(q); $('#cl').innerHTML=cs.filter(c=>!Q||U([c.name,c.mobile,c.aadhaar,c.village,c.careOf].join(' ')).includes(Q)).slice(0,60)
     .map(c=>`<div class="item" data-id="${c.id}"><div><b>${esc(c.name)}</b><div class="muted">${esc(c.rel||'')} ${esc(c.careOf||'')} · ${esc(c.village||'')}</div></div><div class="muted" style="text-align:right">${esc(c.mobile||'')}<br>${c.aadhaar?'Aadhaar ••'+esc(String(c.aadhaar).slice(-4)):''}</div></div>`).join('') || '<p class="muted">No match.</p>'; };
   $('#cq').oninput=e=>draw(e.target.value); draw(''); setTimeout(()=>$('#cq')&&$('#cq').focus(),50);
-  $('#cl').onclick=e=>{ const it=e.target.closest('.item'); if(!it) return; const c=cs.find(x=>x.id===it.dataset.id); closeModal();
-    CUST_FIELDS.forEach(k=>setF(k,c[k],false)); CUR.customerId=c.id; CUR.imgs={...(c.imgs||{}),...(CUR.imgs||{})}; renderThumbs(); $('#saleTitle').textContent=c.name; toast('Loaded '+esc(c.name)); };
+  $('#cl').onclick=e=>{ const it=e.target.closest('.item'); if(!it) return; closeModal(); cb(cs.find(x=>x.id===it.dataset.id)); };
 }
 function renderThumbs(){ const im=CUR.imgs||{}; const names={aadhaar:'Aadhaar',aadhaarBack:'Aadhaar back',pan:'PAN'}; $('#thumbs').innerHTML=Object.keys(im).filter(k=>im[k]).map(k=>`<figure><img src="${im[k]}" onclick="openImg('${k}')"><figcaption>${names[k]||k}</figcaption></figure>`).join(''); }
 function openImg(k){ const w=window.open(); if(w) w.document.write('<img style="max-width:100%" src="'+CUR.imgs[k]+'">'); }
@@ -557,6 +583,21 @@ function parseAadhaarText(t){
   const pin=t.match(/\b(5\d{5})\b/); if(pin) out.pin=pin[1];
   return out;
 }
+/* Aadhaar back-side address: "Address: S/O X, house, street, landmark, VTC, PO: y, Sub District, District, State - PIN" */
+const STATES=/^(ANDHRA PRADESH|TELANGANA|TAMIL NADU|KARNATAKA|ODISHA|MAHARASHTRA|INDIA)\b/;
+function parseAadhaarAddress(t){
+  const out={}; let a=t.replace(/\r/g,'').split('\n').map(x=>x.trim()).filter(Boolean).join(', ');
+  const m=a.match(/Address\s*[:;.]?\s*/i); if(m) a=a.slice(m.index+m[0].length);
+  const pin=a.match(/\b([1-9]\d{5})\b/); if(pin){ out.pin=pin[1]; a=a.slice(0,pin.index); }
+  const co=a.match(/\b([SWDC])\s?\/\s?[O0]\s*[:.]?\s*([A-Za-z .]{3,40}?)\s*,/i); if(co){ out.rel=co[1].toUpperCase()+'/O'; out.careOf=U(co[2]); a=a.slice(co.index+co[0].length); }
+  const parts=a.split(',').map(x=>U(x.replace(/[^A-Za-z0-9 .\/\-]/g,'').replace(/^[\s.\-]+|[\s.\-]+$/g,''))).filter(x=>x.length>1 && !/^(P\.?\s?O\b|POST\b)/.test(x) && !STATES.test(x));
+  if(parts.length) out.district=parts.pop().replace(/\s*DIST(RICT)?\.?$/,'');
+  if(parts.length) out.mandal=parts.pop().replace(/\s*(MANDAL|\(M\))$/,'');
+  if(parts.length) out.village=parts.pop().replace(/\s*\(V\)$/,'');
+  if(parts.length) out.house=parts.shift();
+  if(parts.length) out.street=parts.join(', ');
+  return out;
+}
 function parsePAN(t){
   const out={}; const toks=t.toUpperCase().split(/[^A-Z0-9]+/);
   const L={'0':'O','1':'I','5':'S','8':'B','2':'Z'}, D={'O':'0','I':'1','S':'5','B':'8','Z':'2','L':'1'};
@@ -572,7 +613,7 @@ async function scan(kind, file){
   let img; try{ img=await loadImg(file); }catch(e){ status('Could not open that image.'); return; }
   CUR.imgs=CUR.imgs||{}; CUR.imgs[kind]=await thumb(img); renderThumbs();
   const filled=[];
-  const apply=(o,overwrite)=>{ Object.entries(o).forEach(([k,v])=>{ if(k.startsWith('_')||k==='last4'||!v) return; if(overwrite || !CUR[k]){ setF(k, typeof v==='string'&&k!=='dob'?v.toUpperCase():v); filled.push(k);} }); };
+  const apply=(o,overwrite)=>{ Object.entries(o).forEach(([k,v])=>{ if(k.startsWith('_')||k==='last4'||!v) return; if(overwrite || !CUR[k] || (k==='district' && U(CUR[k])===U(S.defDistrict))){ setF(k, typeof v==='string'&&k!=='dob'?v.toUpperCase():v); filled.push(k);} }); };
   if(kind==='pan'){
     try{ status('Reading PAN with OCR…'); const t=await ocr(img); const o=parsePAN(t); apply(o, true); CUR.d_pan=true; const cb=$('[data-f="d_pan"]'); if(cb) cb.checked=true; status(o.pan?`PAN found: <b>${o.pan}</b>. Please verify.`:'Could not read PAN number — type it in.'); }
     catch(e){ status('OCR failed: '+esc(e.message)+' — type the PAN manually.'); }
@@ -585,8 +626,10 @@ async function scan(kind, file){
   status(msg);
   if(!qd || !String(CUR.aadhaar||'').replace(/\s/g,'').match(/^\d{12}$/)){
     try{ const t=await ocr(img); const o=parseAadhaarText(t);
+      if(!qd && (kind==='aadhaarBack' || /Address|VTC|District/i.test(t))) Object.assign(o, parseAadhaarAddress(t));
       if(qd && qd.last4 && o.aadhaar && !o.aadhaar.replace(/\s/g,'').endsWith(qd.last4)) delete o.aadhaar;
       if(qd){ apply({aadhaar:o.aadhaar},false); } else apply(o,false);
+      if(!qd && o.village) msg += ` Address: <b>${esc([o.village,o.mandal,o.district].filter(Boolean).join(', '))}</b>.`;
       msg += o.aadhaar? ` Aadhaar no: <b>${o.aadhaar}</b>.` : ' (Aadhaar number not readable — type it.)';
     }catch(e){ msg += ' OCR: '+esc(e.message); }
   }
@@ -771,9 +814,10 @@ VIEWS.demo = async () => {
    <div><label>Date</label><input id="dm_date" type="date" value="${today()}"></div>
    <div><label>Model</label><div class="fwrap"><input id="dm_model" class="up" list="dl_models"><button class="btn sm" type="button" onclick="pickModel(m=>$('#dm_model').value=m.name)">Browse</button></div></div>
    <div><label>Serial / Chassis no</label><input id="dm_serial" class="up"></div>
+   <div class="full"><button class="btn sm" type="button" onclick="customerModal(c=>['village','mandal','district'].forEach(k=>$('#dm_'+k).value=U(c[k])))">👥 Fill village / mandal / district from a customer</button></div>
    <div><label>Village</label><input id="dm_village" class="up"></div>
    <div><label>Mandal</label><input id="dm_mandal" class="up"></div>
-   <div><label>District</label><input id="dm_district" class="up" value="WEST GODAVARI"></div>
+   <div><label>District</label><input id="dm_district" class="up" list="dl_district" value="${esc(U(S.defDistrict))}"></div>
    <div class="full"><label><input type="checkbox" id="dm_mark" style="width:auto" checked> Mark this tractor as DEMO in stock</label></div>
   </div><div class="row" style="margin-top:12px"><button class="btn pri" onclick="genDemo()">Generate demo letter</button></div></div>
   <div class="card"><h2>Demo history</h2><div class="tw"><table><thead><tr><th>Date</th><th>Model</th><th>Serial</th><th>Place</th><th></th></tr></thead><tbody>
@@ -802,7 +846,7 @@ VIEWS.settings = async () => {
    ${F('dealerName','Dealer name')}${F('gstin','GSTIN')}${F('phone','Phone')}${F('email','E-mail')}
    <div class="full"><label>Address line 1</label><input id="st_addr1" value="${esc(S.addr1)}"></div>
    <div class="full"><label>Address line 2</label><input id="st_addr2" value="${esc(S.addr2)}"></div>
-   ${F('invPrefix','Invoice no prefix')}${F('invNext','Next invoice number')}${F('gst','GST % (total)')}${F('hsn','Default HSN')}
+   ${F('invPrefix','Invoice no prefix')}${F('invNext','Next invoice number')}${F('gst','GST % (total)')}${F('hsn','Default HSN')}${F('defDistrict','Default district (new sale / demo)')}
   </div><div class="row" style="margin-top:12px"><button class="btn pri" onclick="saveSt()">Save</button></div></div>
   <div class="card"><h2>Models & your prices (incl. GST)</h2>
    <p class="muted" style="margin-top:0">All current Powertrac, Farmtrac & Digitrac models are listed. Enter <b>your</b> on-road / invoice price so it fills automatically in a sale. The grey ~range is only an indicative market price.</p>
@@ -826,7 +870,7 @@ function drawModels(){ const Q=U($('#mfilter')?.value||'');
   const rows=S.models.map((m,i)=>[m,i]).filter(([m])=>!Q||U(m.name+' '+(m.hp||'')).includes(Q)).sort(([a],[b])=>(BRANDS.indexOf(a.brand)+1||9)-(BRANDS.indexOf(b.brand)+1||9)||(a.hp||0)-(b.hp||0));
   $('#models').innerHTML=rows.map(([m,i])=>`<div class="row" style="margin-bottom:6px">${m.cat?`<div style="flex:2;min-width:170px"><b style="font-size:13px">${esc(m.name)}</b><div class="muted">${m.hp} HP · ${m.drive}${m.ref?` · ~₹${lakh(m.ref[0])}–${lakh(m.ref[1])}`:''}</div></div>`:`<input class="up" style="flex:2;min-width:160px" value="${esc(m.name)}" placeholder="Model name" onchange="S.models[${i}].name=this.value.toUpperCase();S.models[${i}].brand=brandOf(this.value)">`}<input type="number" inputmode="numeric" style="flex:1;min-width:110px" value="${m.price||''}" placeholder="Your price ₹" onchange="S.models[${i}].price=num(this.value)">${m.cat?'':`<button class="btn sm ghost" onclick="S.models.splice(${i},1);drawModels()">✕</button>`}</div>`).join('')
    +`<div class="actionbar" style="position:sticky;margin:8px -14px -14px;border-radius:0 0 var(--radius) var(--radius)"><button class="btn pri" onclick="saveSettings().then(()=>toast('Models & prices saved ✔'))">💾 Save models & prices</button></div>`; }
-async function saveSt(){ ['dealerName','gstin','phone','email','addr1','addr2','invPrefix','hsn'].forEach(k=>S[k]=$('#st_'+k).value.trim()); S.invNext=parseInt($('#st_invNext').value)||S.invNext; S.gst=num($('#st_gst').value)||5; S.banks=$('#st_banks').value.split('\n').map(x=>x.trim().toUpperCase()).filter(Boolean); await saveSettings(); toast('Settings saved ✔'); }
+async function saveSt(){ ['dealerName','gstin','phone','email','addr1','addr2','invPrefix','hsn'].forEach(k=>S[k]=$('#st_'+k).value.trim()); S.defDistrict=U($('#st_defDistrict').value); S.invNext=parseInt($('#st_invNext').value)||S.invNext; S.gst=num($('#st_gst').value)||5; S.banks=$('#st_banks').value.split('\n').map(x=>x.trim().toUpperCase()).filter(Boolean); await saveSettings(); toast('Settings saved ✔'); }
 async function ifscLookup(){ const c=$('#ifsc').value.trim().toUpperCase(); if(!c) return; $('#ifscOut').textContent='Looking up…'; try{ const r=await fetch('https://ifsc.razorpay.com/'+c); if(!r.ok) throw 0; const j=await r.json(); $('#ifscOut').textContent=`${j.BANK}, ${j.BRANCH}, ${j.CITY}`; const name=U(j.BANK); const ta=$('#st_banks'); if(!ta.value.toUpperCase().includes(name)) ta.value=name+'\n'+ta.value; }catch(e){ $('#ifscOut').textContent='Not found / offline'; } }
 async function chooseDir(){ if(!window.showDirectoryPicker){ toast('Folder saving works in Chrome/Edge on PC. On phone, files go to Downloads.'); return; } try{ SAVE_DIR=await showDirectoryPicker({mode:'readwrite'}); await DB.put('kv',{id:'saveDir',h:SAVE_DIR}); $('#dirName').textContent='Using: '+SAVE_DIR.name; }catch(e){} }
 async function backup(){ const out={app:'dealerdesk',v:1,at:new Date().toISOString()}; for(const s of ['kv','customers','stock','sales','demos']) out[s]=(await DB.all(s)).filter(x=>x.id!=='saveDir'); LAST_FILES=[]; await deliver(new Blob([JSON.stringify(out)],{type:'application/json'}),`DealerDesk Backup ${fmtD(today(),'-')}.json`); afterGen(); }

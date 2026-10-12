@@ -59,6 +59,23 @@ const exe = fs.existsSync('/opt/pw-browsers/chromium') ? {executablePath:'/opt/p
   for(const d of dls.slice(4)){ await d.saveAs('out/'+d.suggestedFilename()); console.log('DL',d.suggestedFilename()); }
   await p.click('nav button:has-text("Settings")'); await p.waitForTimeout(400); await p.screenshot({path:'shots/settings.png'});
   await p.click('nav button:has-text("Home")'); await p.waitForTimeout(400); await p.screenshot({path:'shots/home2.png',fullPage:true});
+  // address parser cases
+  console.log('ADDR', JSON.stringify(await p.evaluate(()=>[
+    'Address: S/O: Suresh Babu, 2-45, Temple Street, Lakshmipuram, Tiruvuru, Krishna, Andhra Pradesh - 521235',
+    'Address:\nW/O Ramesh,\n1-23, Main Road,\nThorredu, PO: Thorredu,\nRajahmundry Rural, East Godavari,\nAndhra Pradesh, 533294'].map(parseAadhaarAddress))));
+  // remembered place: known village fills mandal / district / PIN
+  await p.click('nav button:has-text("New sale")'); await p.waitForTimeout(300);
+  await p.fill('[data-f="village"]','RAVIPADU'); await p.press('[data-f="village"]','Tab'); await p.waitForTimeout(200);
+  console.log('PLACE', await p.inputValue('[data-f="mandal"]'), '|', await p.inputValue('[data-f="district"]'), '|', await p.inputValue('[data-f="pin"]'));
+  // Aadhaar back side without QR -> OCR address
+  await p.click('button:has-text("New")'); await p.waitForTimeout(300);
+  const ap=await ctx.newPage(); await ap.setContent('<div style="padding:30px;font:28px Arial;background:#fff;width:900px;line-height:1.5">Address:<br>S/O: Suresh Babu, 2-45, Temple Street,<br>Lakshmipuram, Tiruvuru, Krishna,<br>Andhra Pradesh - 521235<br><b style="font-size:40px">2345 6789 0124</b></div>');
+  await ap.locator('div').screenshot({path:'aback.png'}); await ap.close();
+  fc=p.waitForEvent('filechooser'); await p.click('button:has-text("Aadhaar back")'); (await fc).setFiles('aback.png');
+  await p.waitForFunction(()=>/Check yellow|OCR:|type it/.test(document.querySelector('#scanStatus').textContent),null,{timeout:120000});
+  console.log('BACK', await p.textContent('#scanStatus'));
+  console.log('BACK FIELDS', await p.evaluate(()=>['careOf','house','street','village','mandal','district','pin'].map(k=>k+'='+document.querySelector(`[data-f="${k}"]`).value).join(' | ')));
+  await p.screenshot({path:'shots/back.png',fullPage:true});
   console.log('EXTERNAL REQUESTS', external.length? external : 'none');
   await b.close();
 })();
