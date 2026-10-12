@@ -1,0 +1,61 @@
+DEALER DESK - Quotation / Tax Invoice / TR Format / Check List / Demo Letter / Registers
+=======================================================================================
+
+ON THE PC
+1. Double-click "Dealer Desk.html" -> opens in Chrome/Edge. Works offline.
+2. Settings tab (first time): check dealer details, invoice prefix "24-26/" and
+   NEXT invoice number (set to your real next number), banks, and enter YOUR price
+   for the models you sell (all current Powertrac/Farmtrac/Digitrac models are
+   listed; the grey ~range is only an indicative market price).
+   Optional: "Choose folder" so files save straight into a folder instead of Downloads.
+3. Stock register: add each tractor when it arrives (chassis, engine, model, mfg).
+
+DAILY FLOW (one entry -> all documents) - "New sale" walks you through 5 steps:
+   Customer -> Tractor -> Price & finance -> Delivery & TR -> Documents
+   (the step buttons at the top show how many key fields are filled; tap any step to jump)
+1. Customer: "Aadhaar (QR side / front)" -> take/choose photo of the Aadhaar
+   (on PC you can also drag the photo onto the green box).
+   The QR code fills name, S/O, DOB, house, street, village, mandal, district, PIN.
+   Yellow fields = auto-filled, check them. Aadhaar no. / PAN are read by the
+   built-in text reader (works fully offline, nothing is sent anywhere).
+   A red note under Mobile / Aadhaar / PAN / PIN means the number looks wrong.
+   "Existing customer" searches customers you already saved.
+2. Tractor: pick from stock, or "Browse" all Powertrac / Farmtrac / Digitrac models.
+3. Price & finance: price fills from Settings; the GST breakup is shown live.
+   Type hypothecation bank (or CASH). Date defaults to today.
+4. Documents: each document shows "Ready" or what is missing -> Download,
+   or "Generate all 3". (The buttons in the bottom bar work from any step.)
+   - Invoice number is given automatically on the first invoice and saved.
+   - GST split (2.5% + 2.5%) and amounts in words are calculated.
+   - Stock is marked SOLD; customer is saved to the database; sale goes in the
+     Sales register.
+5. Later (TR no, PR no, insurance, delivery date): open the sale from
+   Sales register / Home, fill in, press TR + Check list again.
+Demo letter tab: pick tractor + village/mandal/district -> Generate.
+Registers and customers export to Excel with the "Excel" button.
+
+ON THE PHONE
+Open the web link (GitHub Pages) in Chrome -> menu (3 dots) -> "Add to Home screen".
+After that it works like an app. The app contains NO customer data; data stays
+inside each device's browser. (The page is ~10 MB because the text reader is built in;
+it downloads once, then opens from the browser cache.)
+On phone, after generating, tap "Share / WhatsApp" to send files.
+
+DATA & BACKUP  (important)
+- Data is stored only in that browser on that device. Clearing browser data erases it.
+- Settings -> Backup weekly (save the .json to Google Drive / pen drive).
+- To copy PC data to phone: Backup on PC -> Restore on phone.
+- Aadhaar/PAN numbers and photos are sensitive: keep backups private.
+
+LIMITS / NOTES
+- SBI or bank loan APIs: not publicly available free; slot kept in Settings.
+  IFSC lookup (free) is included.
+- Quotation / invoice text (e.g. "KUBOTA UNIT/SPARE") comes from your original
+  templates; edit source/tpl files or ask Claude to change wording.
+- Built with free open-source libraries: docxtemplater, PizZip, ExcelJS,
+  ZXing + jsQR (QR), pako, Tesseract.js (OCR, github.com/naptha/tesseract.js - bundled, runs on the device).
+
+FOR CLAUDE CODE / DEVELOPER
+source/app.html is the app; source/tpl has the Word/Excel templates;
+model list is source/models.json. Run "npm i" then "python build.py" to rebuild "Dealer Desk.html" (dist/).
+templatize.py shows how the original documents were turned into templates.

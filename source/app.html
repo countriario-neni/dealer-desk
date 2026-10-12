@@ -1,0 +1,853 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14532d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Dealer Desk</title>
+<style>
+:root{
+  --bg:#f4f5f0; --card:#ffffff; --ink:#1b1f1a; --mute:#5f6b5c; --line:#dfe3da;
+  --brand:#14532d; --brand2:#1f7a43; --accent:#c2410c; --warn:#fff6d6; --ok:#e7f5ec; --bad:#fde8e4;
+  --radius:12px; --onbrand:#fff;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1410; --card:#18201a; --ink:#e8ede6; --mute:#9aa79a; --line:#2a352c;
+    --brand:#4ade80; --brand2:#22c55e; --accent:#fb923c; --warn:#3a3214; --ok:#16301f; --bad:#3a1d18; --onbrand:#0b1a10;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1410; --card:#18201a; --ink:#e8ede6; --mute:#9aa79a; --line:#2a352c;
+  --brand:#4ade80; --brand2:#22c55e; --accent:#fb923c; --warn:#3a3214; --ok:#16301f; --bad:#3a1d18; --onbrand:#0b1a10;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--brand);color:#fff;padding:10px 16px calc(10px) 16px;display:flex;align-items:center;gap:10px}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) header{background:#13301d}}
+:root[data-theme="dark"] header{background:#13301d}
+header h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.2px}
+header small{opacity:.8;font-size:12px}
+nav{background:var(--card);border-bottom:1px solid var(--line);display:flex;overflow-x:auto;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav button{flex:0 0 auto;border:0;background:none;padding:12px 14px;font:inherit;color:var(--mute);border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+nav button.on{color:var(--brand);border-bottom-color:var(--brand);font-weight:600}
+#top{position:sticky;top:0;z-index:20}
+main{max-width:980px;margin:0 auto;padding:14px 16px 120px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:14px}
+.card h2{font-size:15px;margin:0 0 10px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px 12px}
+label{display:block;font-size:12px;color:var(--mute);margin-bottom:3px}
+input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;text-transform:none}
+input.up{text-transform:uppercase}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--brand2);outline-offset:-1px}
+.hl{background:var(--warn)!important}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:9px 13px;border-radius:9px;font:inherit;font-weight:600;cursor:pointer;text-decoration:none}
+.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn.pri{color:#0b1a10}}
+:root[data-theme="dark"] .btn.pri{color:#0b1a10}
+.btn.acc{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.sm{padding:6px 10px;font-size:13px}
+.btn.ghost{background:transparent}
+.btn:disabled{opacity:.5}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px}
+.stat b{display:block;font-size:24px}
+.stat span{font-size:12px;color:var(--mute)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--mute);font-weight:600}
+.tw{overflow-x:auto}
+.chip{display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;background:var(--ok);font-weight:600}
+.chip.sold{background:var(--bad)}
+.chip.demo{background:var(--warn)}
+.muted{color:var(--mute);font-size:12px}
+.list .item{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.list .item:last-child{border-bottom:0}
+.actionbar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--card);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;overflow-x:auto}
+.actionbar .btn{flex:0 0 auto}
+.checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px}
+.checks label{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink);margin:0}
+.checks input{width:auto}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;z-index:50;background:#1b1f1a;color:#fff;padding:10px 14px;border-radius:10px;display:none;max-width:92vw;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+#toast .row{margin-top:8px}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.thumbs figure{margin:0;text-align:center;font-size:11px;color:var(--mute)}
+.thumbs img{width:110px;height:70px;object-fit:cover;border-radius:6px;border:1px solid var(--line);display:block}
+.scanbox{border:1px dashed var(--brand2);border-radius:10px;padding:12px;background:var(--ok)}
+.hide{display:none!important}
+.search{max-width:320px}
+@media (max-width:560px){ main{padding:12px 12px 120px} .grid{grid-template-columns:1fr 1fr} .grid .full{grid-column:1/-1}}
+.full{grid-column:1/-1}
+/* --- wizard, pickers, modals --- */
+.steps{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:12px;padding:2px}
+.steps::-webkit-scrollbar{display:none}
+.step{flex:1 0 auto;display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);border-radius:99px;padding:6px 12px 6px 6px;cursor:pointer;font:inherit;font-size:13px;color:var(--ink);white-space:nowrap}
+.step i{font-style:normal;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--line);font-size:13px}
+.step small{color:var(--mute);font-size:11px}
+.step.on{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand);font-weight:600}
+.step.done i{background:var(--ok);outline:2px solid var(--brand2)}
+.pane{display:none}.pane.on{display:block;animation:fade .2s ease-out}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}}
+.stepnav{display:flex;justify-content:space-between;gap:8px;margin:0 0 14px}
+.fwrap{display:flex;gap:6px}.fwrap input{flex:1;min-width:0}
+.hint{font-size:11px;margin-top:3px;color:#b42318}
+input.bad{border-color:#d92d20}
+.calc{display:grid;grid-template-columns:1fr auto;gap:5px 12px;font-size:14px}
+.calc b{text-align:right;font-variant-numeric:tabular-nums}
+.calc .tot{font-size:18px;border-top:1px solid var(--line);padding-top:6px}
+.words{font-size:12px;color:var(--mute);margin-top:8px}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60;display:flex;align-items:flex-end;justify-content:center;animation:fade .15s}
+.modal{background:var(--card);color:var(--ink);width:100%;max-width:760px;max-height:88vh;display:flex;flex-direction:column;border-radius:16px 16px 0 0;overflow:hidden}
+@media (min-width:700px){.modal-bg{align-items:center}.modal{border-radius:16px}}
+.mh{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.mh b{flex:1;font-size:16px}
+.mb{overflow:auto;padding:12px 14px calc(14px + env(safe-area-inset-bottom))}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pills button{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:99px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.pills button.on{background:var(--brand);border-color:var(--brand);color:var(--onbrand)}
+.mcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-top:10px}
+.mcard{border:1px solid var(--line);border-left:4px solid var(--bc,var(--line));border-radius:10px;padding:9px 10px;cursor:pointer;background:var(--bg);text-align:left;font:inherit;color:var(--ink)}
+.mcard:hover,.mcard:focus{border-color:var(--brand2);outline:none}
+.mcard b{display:block;font-size:13px;line-height:1.25}
+.mcard .muted{display:block;margin-top:3px}
+.b-POWERTRAC{--bc:#d97706}.b-FARMTRAC{--bc:#dc2626}.b-DIGITRAC{--bc:#2563eb}
+.bar{height:6px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:8px}
+.bar>i{display:block;height:100%;width:0;background:var(--brand2);transition:width .2s}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.tile{display:flex;flex-direction:column;gap:4px;text-align:left;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:var(--radius);padding:14px;font:inherit;cursor:pointer;transition:transform .1s,border-color .1s}
+.tile:hover{border-color:var(--brand2);transform:translateY(-1px)}
+.tile .ic{font-size:26px}.tile b{font-size:15px}
+.tile.pri{background:var(--brand);border-color:var(--brand);color:var(--onbrand)}
+.tile.pri .muted{color:inherit;opacity:.85}
+.docs{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.doc{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--bg);display:flex;flex-direction:column;gap:8px}
+.doc .ok{color:var(--brand2);font-size:12px}.doc .miss{color:var(--accent);font-size:12px}
+.scanbox.drag{outline:3px dashed var(--brand);outline-offset:2px}
+.stat{cursor:default}
+</style>
+</head>
+<body>
+<div id="top"><header>
+  <div style="flex:1">
+    <h1 id="hdrName">Dealer Desk</h1>
+    <small>Quotation · Invoice · TR · Demo · Registers</small>
+  </div>
+  <button class="btn sm ghost" style="color:#fff;border-color:rgba(255,255,255,.4)" onclick="toggleTheme()" title="Theme">◐</button>
+</header>
+<nav id="nav"></nav></div>
+<main id="main"></main>
+<div class="actionbar hide" id="actionbar"></div>
+<div id="toast"></div>
+<input type="file" id="filePick" accept="image/*" class="hide">
+<input type="file" id="restorePick" accept=".json,application/json" class="hide">
+
+<!--LIBS-->
+<script>
+const TPL = __TPL_JSON__;
+/* ============ helpers ============ */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const today = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+const fmtD = (iso, sep='.') => { if(!iso) return ''; const m=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/); return m? m[3]+sep+m[2]+sep+m[1] : iso; };
+const num = v => { const n=parseFloat(String(v??'').replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; };
+const r2 = n => Math.round((n+Number.EPSILON)*100)/100;
+const inr = n => Number(n).toLocaleString('en-IN',{maximumFractionDigits:2});
+const inrQ = n => Number(n).toLocaleString('en-IN',{maximumFractionDigits:0}) + '/-';
+const U = s => String(s??'').toUpperCase().trim();
+const safeName = s => String(s||'').replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim().slice(0,80);
+const b64ToBytes = b => Uint8Array.from(atob(b), c => c.charCodeAt(0));
+
+function toast(msg, actions){
+  const t=$('#toast'); t.innerHTML='<div>'+msg+'</div>'+(actions?'<div class="row" id="toastAct"></div>':'');
+  if(actions){ actions.forEach(a=>{const b=document.createElement('button'); b.className='btn sm'+(a.pri?' pri':''); b.textContent=a.label; b.onclick=()=>{a.fn(); }; $('#toastAct').appendChild(b);}); }
+  t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none', actions?12000:3500);
+}
+
+/* Indian number to words */
+const ONES=['','ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN','ELEVEN','TWELVE','THIRTEEN','FOURTEEN','FIFTEEN','SIXTEEN','SEVENTEEN','EIGHTEEN','NINETEEN'];
+const TENS=['','','TWENTY','THIRTY','FORTY','FIFTY','SIXTY','SEVENTY','EIGHTY','NINETY'];
+function two(n){ return n<20?ONES[n]:(TENS[Math.floor(n/10)]+(n%10?' '+ONES[n%10]:'')); }
+function three(n){ const h=Math.floor(n/100), r=n%100; return (h?ONES[h]+' HUNDRED'+(r?' ':''):'')+(r?two(r):''); }
+function intWords(n){
+  n=Math.floor(n); if(n===0) return 'ZERO';
+  const parts=[]; const cr=Math.floor(n/1e7); n%=1e7; const lk=Math.floor(n/1e5); n%=1e5; const th=Math.floor(n/1e3); n%=1e3;
+  if(cr) parts.push(intWords(cr)+' CRORE'); if(lk) parts.push(two(lk)+' LAKH'); if(th) parts.push(two(th)+' THOUSAND'); if(n) parts.push(three(n));
+  return parts.join(' ');
+}
+function rupeeWords(x, style){ // style 'q' => "TEN LAKH ... RUPEES ONLY"; 'r' => "RUPEES ... AND .. PAISE ONLY"
+  x=r2(x); const rs=Math.floor(x), ps=Math.round((x-rs)*100);
+  if(style==='r') return 'RUPEES '+intWords(rs)+(ps?' AND '+two(ps)+' PAISE':'')+' ONLY';
+  return intWords(rs)+' RUPEES'+(ps?' AND '+two(ps)+' PAISE':'')+' ONLY';
+}
+const title = s => s.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
+
+/* ============ IndexedDB ============ */
+const DB = {
+  db:null,
+  open(){ return new Promise((res,rej)=>{ const r=indexedDB.open('dealerdesk',1);
+    r.onupgradeneeded=()=>{ const d=r.result; ['kv','customers','stock','sales','demos'].forEach(s=>{ if(!d.objectStoreNames.contains(s)) d.createObjectStore(s,{keyPath:'id'}); }); };
+    r.onsuccess=()=>{DB.db=r.result;res()}; r.onerror=()=>rej(r.error); }); },
+  tx(s,m){ return DB.db.transaction(s,m).objectStore(s); },
+  all(s){ return new Promise((res,rej)=>{ const q=DB.tx(s,'readonly').getAll(); q.onsuccess=()=>res(q.result||[]); q.onerror=()=>rej(q.error); }); },
+  get(s,id){ return new Promise((res,rej)=>{ const q=DB.tx(s,'readonly').get(id); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); },
+  put(s,o){ return new Promise((res,rej)=>{ const q=DB.tx(s,'readwrite').put(o); q.onsuccess=()=>res(o); q.onerror=()=>rej(q.error); }); },
+  del(s,id){ return new Promise((res,rej)=>{ const q=DB.tx(s,'readwrite').delete(id); q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); }); },
+  clear(s){ return new Promise((res,rej)=>{ const q=DB.tx(s,'readwrite').clear(); q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); }); },
+};
+const DEFAULT_SETTINGS = {
+  id:'settings',
+  dealerName:'SRI MANIKANTA SWAMY AGROS',
+  addr1:'1-16, Main Road,Lakshmipuram, Near MilkProject Opp',
+  addr2:'TIRUVURU-521235, Krishna District, A.P',
+  gstin:'37BSHPG6211M1ZL', phone:'9440481826,9398391992', email:'lakshmipuramsrinubabu@gmail.com',
+  demoPlace:'LAKSHMIPURAM TIRUVURU MANDAL',
+  invPrefix:'24-26/', invNext:29, gst:5, hsn:'87019200',
+  models:[{name:'POWERTRAC EURO 50 4WD', price:1057000},{name:'POWERTRAC EURO 439 E3', price:0}],
+  banks:['AXIS BANK LIMITED','HDFC BANK LIMITED','UNION BANK OF INDIA','STATE BANK OF INDIA','ICICI BANK LIMITED','CANARA BANK','INDIAN BANK','KOTAK MAHINDRA BANK LIMITED','CASH'],
+};
+let S = {...DEFAULT_SETTINGS};
+/* Escorts Kubota catalogue (Powertrac / Farmtrac / Digitrac, Oct 2026). ref = indicative ex-showroom range, never used on documents. */
+const CATALOG = __MODELS_JSON__;
+const BRANDS = ['POWERTRAC','FARMTRAC','DIGITRAC'];
+const brandOf = n => BRANDS.find(b=>U(n).startsWith(b)) || 'OTHER';
+function mergeCatalog(){
+  S.models=(S.models||[]).map(m=>({...m}));
+  CATALOG.forEach(c=>{ const m=S.models.find(x=>U(x.name)===U(c.name));
+    if(m) Object.assign(m,{brand:c.brand,hp:c.hp,drive:c.drive,ref:c.ref,cat:1}); else S.models.push({...c,price:0,cat:1}); });
+  S.models.forEach(m=>{ m.brand=m.brand||brandOf(m.name); });
+}
+async function loadSettings(){ const s=await DB.get('kv','settings'); S={...DEFAULT_SETTINGS,...(s||{})}; mergeCatalog(); $('#hdrName').textContent=title(S.dealerName); document.title=title(S.dealerName)+' · Dealer Desk'; }
+async function saveSettings(){ await DB.put('kv',S); await loadSettings(); }
+
+/* ============ form schema ============ */
+const DOCS = [
+ ['d_aadhaar','Aadhaar card (both sides)'],['d_pan','PAN card'],['d_quote','Quotation'],['d_do','Delivery Order (DO)'],
+ ['d_mmr','MMR receipt'],['d_invoice','Tax invoice'],['d_dod','Date of delivery'],['d_photos','Customer photos with vehicle (4 sides)'],
+ ['d_ins','Insurance policy'],['d_tr','Temporary Registration (TR)'],['d_rc','Permanent Registration (RC)'],['d_plate','Number plate'],['d_other','Other process (management)']
+];
+const SECTIONS = [
+ {id:'cust', t:'Customer', f:[
+  ['name','Customer name',{up:1,full:1}],['rel','Relation',{opts:['S/O','W/O','D/O','C/O']}],['careOf','Father / Husband name',{up:1}],
+  ['dob','Date of birth',{ph:'dd/mm/yyyy'}],['gender','Gender',{opts:['','MALE','FEMALE']}],['mobile','Mobile',{type:'tel'}],
+  ['house','Door number',{up:1}],['street','Street',{up:1}],['village','Village',{up:1}],['mandal','Mandal',{up:1}],
+  ['district','District',{up:1}],['pin','PIN code',{type:'tel'}],['aadhaar','Aadhaar number',{type:'tel'}],['pan','PAN number',{up:1}] ]},
+ {id:'veh', t:'Tractor', f:[
+  ['stockId','Pick from stock',{stock:1,full:1}],['model','Model',{up:1,list:'models'}],['engine','Engine no',{up:1}],['chassis','Chassis no',{up:1}],
+  ['mfg','Mfg month & year',{ph:'01/26'}],['hsn','HSN code'] ]},
+ {id:'price', t:'Price & finance', f:[
+  ['price','Price incl. GST (₹)',{type:'number'}],['hyp','Hypothecation (bank) or CASH',{up:1,list:'banks'}],['payMode','Mode of payment',{opts:['','FINANCE','CASH','CASH + FINANCE','DD / CHEQUE']}],
+  ['quoteDate','Quotation date',{type:'date'}],['invoiceNo','Invoice no (auto on first invoice)'],['invoiceDate','Invoice date',{type:'date'}],
+  ['item2','Extra item on quotation (optional)',{up:1}],['item2amt','Extra item amount',{type:'number'}] ]},
+ {id:'tr', t:'Delivery, insurance & TR', f:[
+  ['deliveryDate','Date of delivery',{type:'date'}],['financeToken','Finance token issued',{opts:['','YES','NO']}],['insCo','Insurance company',{up:1}],
+  ['policyNo','Policy no',{up:1}],['insAmt','Insurance amount',{type:'number'}],['insDate','Insurance date',{type:'date'}],
+  ['inv','INV',{}],['fun','FUN (finance amount)',{}],['mmr','MMR (margin money)',{}],
+  ['trAmt','TR amount',{type:'number'}],['trNo','TR number',{up:1}],['prNo','PR number',{up:1}],
+  ['transport','Transport / Non',{opts:['','TRANSPORT','NON-TRANSPORT']}],['fancy','Fancy / Non',{opts:['','FANCY','NON-FANCY']}],['rto','Area RTO office',{up:1}],
+  ['appNo','Application number',{up:1}],['dueAmt','Customer due amount',{type:'number'}],['hsrp','TR+PR+HSRP status',{up:1}],
+  ['notes','Note',{full:1}] ]},
+];
+const CUST_FIELDS = SECTIONS[0].f.map(x=>x[0]);
+
+/* ============ navigation ============ */
+const TABS = [['home','🏠 Home'],['sale','🧾 New sale'],['sales','📒 Sales register'],['stock','🚜 Stock register'],['customers','👥 Customers'],['demo','📝 Demo letter'],['settings','⚙️ Settings']];
+let TAB='home';
+function renderNav(){ $('#nav').innerHTML = TABS.map(([k,l])=>`<button class="${k===TAB?'on':''}" onclick="go('${k}')">${l}</button>`).join(''); }
+async function go(tab, arg){ TAB=tab; renderNav(); closeModal(); $('#actionbar').classList.add('hide'); $('#main').oninput=null; window.scrollTo(0,0); await VIEWS[tab](arg); }
+
+/* ============ modal + pickers ============ */
+function modal(titleTxt, body){ closeModal(); const bg=document.createElement('div'); bg.className='modal-bg'; bg.id='modal';
+  bg.innerHTML=`<div class="modal" role="dialog" aria-label="${esc(titleTxt)}"><div class="mh"><b>${esc(titleTxt)}</b><button class="btn sm ghost" onclick="closeModal()" aria-label="Close">✕</button></div><div class="mb">${body}</div></div>`;
+  bg.onclick=e=>{ if(e.target===bg) closeModal(); }; document.body.appendChild(bg); return bg; }
+function closeModal(){ const m=$('#modal'); if(m) m.remove(); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+
+const lakh = n => (n/1e5).toFixed(2).replace(/\.?0+$/,'')+' L';
+function pickModel(cb){
+  let brand='ALL', q='';
+  modal('Choose tractor model', `<input id="mq" placeholder="Search model or HP (e.g. 50, euro, 4wd)…" autocomplete="off">
+    <div class="pills" id="mbr" style="margin-top:8px">${['ALL',...BRANDS].map(b=>`<button data-b="${b}" class="${b==='ALL'?'on':''}">${b==='ALL'?'All':title(b)}</button>`).join('')}</div>
+    <div class="mcards" id="mlist"></div>`);
+  const draw=()=>{ const Q=U(q); const list=S.models.filter(m=>m.name && (brand==='ALL'||m.brand===brand) && (!Q || Q.split(/\s+/).every(w=>U(`${m.name} ${m.hp||''}HP ${m.hp||''} ${m.drive||''}`).includes(w))))
+      .sort((a,b)=>(a.brand||'').localeCompare(b.brand||'')||(a.hp||0)-(b.hp||0)||a.name.localeCompare(b.name));
+    $('#mlist').innerHTML=list.map(m=>`<button class="mcard b-${m.brand}" data-n="${esc(m.name)}"><b>${esc(m.name)}</b><span class="muted">${m.hp?m.hp+' HP':''}${m.drive?' · '+m.drive:''}</span><span class="muted">${num(m.price)?'₹'+inr(m.price):m.ref?'~₹'+lakh(m.ref[0])+'–'+lakh(m.ref[1]):'Set price in Settings'}</span></button>`).join('')||'<p class="muted">No model matches. Type the name directly in the Model box.</p>'; };
+  $('#mq').oninput=e=>{ q=e.target.value; draw(); };
+  $('#mbr').onclick=e=>{ const b=e.target.dataset.b; if(!b) return; brand=b; $('#mbr').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.b===b)); draw(); };
+  $('#mlist').onclick=e=>{ const c=e.target.closest('.mcard'); if(!c) return; const m=S.models.find(x=>x.name===c.dataset.n); closeModal(); cb(m); };
+  draw(); setTimeout(()=>$('#mq')&&$('#mq').focus(),50);
+}
+
+/* ============ validation ============ */
+const VD=[[0,1,2,3,4,5,6,7,8,9],[1,2,3,4,0,6,7,8,9,5],[2,3,4,0,1,7,8,9,5,6],[3,4,0,1,2,8,9,5,6,7],[4,0,1,2,3,9,5,6,7,8],[5,9,8,7,6,0,4,3,2,1],[6,5,9,8,7,1,0,4,3,2],[7,6,5,9,8,2,1,0,4,3],[8,7,6,5,9,3,2,1,0,4],[9,8,7,6,5,4,3,2,1,0]];
+const VP=[[0,1,2,3,4,5,6,7,8,9],[1,5,7,6,2,8,3,0,9,4],[5,8,0,3,7,9,6,1,4,2],[8,9,1,6,0,4,3,5,2,7],[9,4,5,3,1,2,6,8,7,0],[4,2,8,6,5,7,3,9,0,1],[2,7,9,3,8,0,6,4,1,5],[7,0,4,6,9,1,3,2,5,8]];
+function verhoeff(s){ if(!/^[2-9]\d{11}$/.test(s)) return false; let c=0; s.split('').reverse().forEach((d,i)=>{ c=VD[c][VP[i%8][+d]]; }); return c===0; }
+const VALID = {
+  mobile: v=>/^[6-9]\d{9}$/.test(v.replace(/\D/g,'').replace(/^91(?=\d{10}$)/,'')) || 'Should be a 10-digit mobile number',
+  aadhaar: v=>verhoeff(v.replace(/\s/g,'')) || 'Aadhaar number looks wrong — please re-check the 12 digits',
+  pan: v=>/^[A-Z]{5}\d{4}[A-Z]$/.test(U(v)) || 'PAN format is ABCDE1234F',
+  pin: v=>/^\d{6}$/.test(v) || 'PIN code has 6 digits',
+};
+function validate(el){ const k=el.dataset.f, fn=VALID[k]; if(!fn) return; const v=el.value.trim(); const r=!v||fn(v);
+  let h=el.parentNode.querySelector('.hint'); if(r===true){ el.classList.remove('bad'); if(h) h.remove(); return; }
+  el.classList.add('bad'); if(!h){ h=document.createElement('div'); h.className='hint'; el.parentNode.appendChild(h); } h.textContent=r; }
+
+/* ============ views ============ */
+const VIEWS = {};
+
+VIEWS.home = async () => {
+  const [stock,sales,custs] = await Promise.all([DB.all('stock'),DB.all('sales'),DB.all('customers')]);
+  const ym = today().slice(0,7);
+  const inStock = stock.filter(s=>s.status==='IN').length;
+  const monthSales = sales.filter(s=>(s.invoiceDate||s.deliveryDate||'').startsWith(ym)).length;
+  const pendTR = sales.filter(s=>s.invoiceNo && !s.trNo).length;
+  const due = sales.reduce((a,s)=>a+num(s.dueAmt),0);
+  const recent = [...sales].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)).slice(0,8);
+  const todo = sales.filter(s=>(s.invoiceNo && !s.trNo) || num(s.dueAmt)>0).slice(0,6);
+  const tile=(ic,t,sub,fn,cls='')=>`<button class="tile ${cls}" onclick="${fn}"><span class="ic">${ic}</span><b>${t}</b><span class="muted">${sub}</span></button>`;
+  $('#main').innerHTML = `
+  <div class="tiles">
+    ${tile('🧾','New sale','Quotation, invoice, TR — step by step',"go('sale')",'pri')}
+    ${tile('📷','Scan Aadhaar','Auto-fill customer from the QR code',"go('sale',{scan:'aadhaar'})")}
+    ${tile('🚜','Add stock','New tractor arrived',"go('stock')")}
+    ${tile('📝','Demo letter','For a demo tractor',"go('demo')")}
+  </div>
+  <div class="stats" style="margin-bottom:14px">
+    <div class="stat"><b>${inStock}</b><span>Tractors in stock</span></div>
+    <div class="stat"><b>${monthSales}</b><span>Sales this month</span></div>
+    <div class="stat"><b>${pendTR}</b><span>Invoiced, TR pending</span></div>
+    <div class="stat"><b>₹${inr(due)}</b><span>Customer dues</span></div>
+  </div>
+  ${todo.length?`<div class="card"><h2>Needs attention</h2><div class="list">${todo.map(s=>`<div class="item" onclick="go('sale',{id:'${s.id}',step:3})"><div><b>${esc(s.name)}</b><div class="muted">${esc(s.model||'')}</div></div><div style="text-align:right">${s.invoiceNo&&!s.trNo?'<span class="chip demo">TR pending</span> ':''}${num(s.dueAmt)>0?`<span class="chip sold">Due ₹${inr(num(s.dueAmt))}</span>`:''}</div></div>`).join('')}</div></div>`:''}
+  <p class="muted">Data is saved only on this device (${custs.length} customers, ${sales.length} sales, ${stock.length} stock). Take a backup from Settings regularly.</p>
+  <div class="card"><h2>Recent sales</h2>
+    <div class="list">${recent.length? recent.map(s=>`<div class="item" onclick="go('sale',{id:'${s.id}'})"><div><b>${esc(s.name||'(no name)')}</b><div class="muted">${esc(s.village||'')} · ${esc(s.model||'')}</div></div><div class="muted" style="text-align:right">${s.invoiceNo?'Inv '+esc(s.invoiceNo):'Quotation'}<br>${fmtD(s.invoiceDate||s.quoteDate)}</div></div>`).join('') : '<p class="muted">No sales yet.</p>'}</div>
+  </div>`;
+};
+
+/* ---------- Sale form ---------- */
+let CUR=null; // current sale object
+function fieldHTML([k,l,o={}]){
+  const v = CUR[k] ?? '';
+  let inp;
+  if(o.stock){ inp = `<select data-f="${k}" onchange="pickStock(this.value)"><option value="">— manual entry —</option></select>`; }
+  else if(o.opts){ inp = `<select data-f="${k}">${o.opts.map(x=>`<option ${x===v?'selected':''}>${x}</option>`).join('')}</select>`; }
+  else inp = `<input data-f="${k}" type="${o.type||'text'}" ${o.list?`list="dl_${o.list}"`:''} class="${o.up?'up':''}" placeholder="${o.ph||''}" value="${esc(v)}" ${k==='model'?'onchange="modelChanged()"':''} ${o.type==='tel'?'inputmode="numeric"':''}>`;
+  if(k==='model') inp = `<div class="fwrap">${inp}<button class="btn sm" type="button" onclick="pickModel(saleModel)">Browse</button></div>`;
+  return `<div class="${o.full?'full':''}"><label>${l}</label>${inp}</div>`;
+}
+const STEPS = [
+  {t:'Customer', ic:'👤', req:['name','careOf','village','mandal','district','mobile']},
+  {t:'Tractor', ic:'🚜', req:['model','engine','chassis']},
+  {t:'Price & finance', ic:'₹', req:['price','hyp']},
+  {t:'Delivery & TR', ic:'📋', req:['deliveryDate','insCo','trNo']},
+  {t:'Documents', ic:'📄', req:[]},
+];
+const DOC_NEEDS = { quote:['name','village','model','price'], invoice:['name','village','model','engine','chassis','price'], tr:['name','model','chassis','deliveryDate'] };
+const FIELD_LABEL = Object.fromEntries(SECTIONS.flatMap(s=>s.f.map(([k,l])=>[k,l])));
+let STEP=0;
+VIEWS.sale = async (arg={}) => {
+  if(arg.id) CUR = await DB.get('sales',arg.id);
+  else if(arg.customerId){ const c=await DB.get('customers',arg.customerId); CUR=blankSale(); CUST_FIELDS.forEach(k=>CUR[k]=c[k]??''); CUR.customerId=c.id; CUR.imgs=c.imgs||{}; }
+  else if(!arg.keep || !CUR) CUR = blankSale();
+  STEP = arg.step ?? 0;
+  const stock = await DB.all('stock');
+  const sec = id => { const s=SECTIONS.find(x=>x.id===id); return `<div class="card"><h2>${s.t}</h2><div class="grid">${s.f.map(fieldHTML).join('')}</div></div>`; };
+  $('#main').innerHTML = `
+  <datalist id="dl_models">${S.models.map(m=>`<option value="${esc(m.name)}">`).join('')}</datalist>
+  <datalist id="dl_banks">${S.banks.map(b=>`<option value="${esc(b)}">`).join('')}</datalist>
+  <div class="row" style="justify-content:space-between;margin-bottom:10px">
+    <div><b id="saleTitle">${CUR.name?esc(CUR.name):'New sale'}</b> <span class="muted">${CUR.invoiceNo?'· Invoice '+esc(CUR.invoiceNo):''}</span></div>
+    <div class="row"><button class="btn sm" onclick="go('sale')">＋ New</button>${CUR._saved?`<button class="btn sm ghost" onclick="deleteSale()">Delete</button>`:''}</div>
+  </div>
+  <div class="steps" id="steps"></div>
+  <div class="pane">
+    <div class="card scanbox" id="scanbox">
+      <h2>Scan documents <span class="muted">photo, file or drag & drop</span></h2>
+      <div class="row">
+        <button class="btn pri" onclick="scan('aadhaar')">📷 Aadhaar (QR side / front)</button>
+        <button class="btn" onclick="scan('aadhaarBack')">📷 Aadhaar back</button>
+        <button class="btn" onclick="scan('pan')">📷 PAN card</button>
+        <button class="btn" onclick="pickCustomer()">👥 Existing customer</button>
+      </div>
+      <div id="scanStatus" class="muted" style="margin-top:8px">Tip: photograph the Aadhaar flat and in good light — the QR code gives the most accurate name & address. Yellow fields were auto-filled, please check them. Reading works offline.</div>
+      <div class="bar hide" id="ocrBar"><i></i></div>
+      <div class="thumbs" id="thumbs"></div>
+    </div>
+    ${sec('cust')}
+  </div>
+  <div class="pane">${sec('veh')}</div>
+  <div class="pane">${sec('price')}
+    <div class="card"><h2>Price breakup <span class="muted">GST ${num(S.gst)||5}% included</span></h2><div id="calcBox"></div></div></div>
+  <div class="pane">${sec('tr')}</div>
+  <div class="pane">
+    <div class="card"><h2>Generate documents</h2><div class="docs" id="docCards"></div>
+      <div class="row" style="margin-top:12px"><button class="btn acc" onclick="gen('all')">⚡ Generate all 3</button></div></div>
+    <div class="card"><h2>Document check list</h2><div class="checks">${DOCS.map(([k,l])=>`<label><input type="checkbox" data-f="${k}" ${CUR[k]?'checked':''}> ${l}</label>`).join('')}</div></div>
+  </div>
+  <div class="stepnav"><button class="btn" id="prevBtn" onclick="setStep(STEP-1)">◀ Back</button><button class="btn pri" id="nextBtn" onclick="setStep(STEP+1)">Next ▶</button></div>`;
+  const sel = $('[data-f="stockId"]');
+  stock.filter(s=>s.status==='IN' || s.id===CUR.stockId).forEach(s=>{ const o=document.createElement('option'); o.value=s.id; o.textContent=`${s.model} · ${s.chassis} · Eng ${s.engine}`+(s.status!=='IN'?' ('+s.status+')':''); if(s.id===CUR.stockId) o.selected=true; sel.appendChild(o); });
+  renderThumbs();
+  $('#actionbar').innerHTML = `
+    <button class="btn" onclick="saveSale(true)">💾 Save</button>
+    <button class="btn pri" onclick="gen('quote')">Quotation</button>
+    <button class="btn pri" onclick="gen('invoice')">Tax invoice</button>
+    <button class="btn pri" onclick="gen('tr')">TR + Check list</button>
+    <button class="btn acc" onclick="gen('all')">Generate all</button>`;
+  $('#actionbar').classList.remove('hide');
+  $('#main').oninput = e=>{ const el=e.target; if(!el.dataset.f) return; el.classList.remove('hl'); if(VALID[el.dataset.f]){ clearTimeout(el._vt); el._vt=setTimeout(()=>validate(el),600); } if(el.dataset.f==='name') $('#saleTitle').textContent=el.value||'New sale'; refresh(); };
+  const sb=$('#scanbox');
+  sb.ondragover=e=>{ e.preventDefault(); sb.classList.add('drag'); }; sb.ondragleave=()=>sb.classList.remove('drag');
+  sb.ondrop=e=>{ e.preventDefault(); sb.classList.remove('drag'); const f=e.dataTransfer.files[0]; if(f&&f.type.startsWith('image/')) scan('aadhaar',f); };
+  setStep(STEP);
+  if(arg.scan) setTimeout(()=>scan(arg.scan),100);
+};
+const val = k => { const el=$(`#main [data-f="${k}"]`); return el? String(el.value).trim() : String(CUR[k]??''); };
+function setStep(i){
+  STEP=Math.max(0,Math.min(STEPS.length-1,i));
+  document.querySelectorAll('#main .pane').forEach((p,j)=>p.classList.toggle('on',j===STEP));
+  $('#prevBtn').style.visibility=STEP?'visible':'hidden';
+  $('#nextBtn').style.visibility=STEP<STEPS.length-1?'visible':'hidden';
+  if(STEP<STEPS.length-1) $('#nextBtn').textContent=`Next: ${STEPS[STEP+1].t} ▶`;
+  refresh(); window.scrollTo({top:0,behavior:'smooth'});
+}
+function refresh(){
+  $('#steps').innerHTML=STEPS.map((s,i)=>{ const n=s.req.filter(k=>val(k)).length; const done=s.req.length&&n===s.req.length;
+    return `<button class="step ${i===STEP?'on':''} ${done?'done':''}" onclick="setStep(${i})"><i>${done?'✓':s.ic}</i><span>${s.t}${s.req.length?`<br><small>${n}/${s.req.length} filled</small>`:''}</span></button>`; }).join('');
+  if(STEP===2) drawCalc();
+  if(STEP===4) drawDocCards();
+}
+function drawCalc(){
+  const c=calc({price:val('price')}); const extra=num(val('item2amt'));
+  $('#calcBox').innerHTML = c.price ? `<div class="calc">
+    <span>Taxable value</span><b>₹${inr(c.taxable)}</b>
+    <span>CGST ${c.half}%</span><b>₹${inr(r2(c.cg))}</b>
+    <span>SGST ${c.half}%</span><b>₹${inr(r2(c.sg))}</b>
+    <span class="tot">Invoice total</span><b class="tot">₹${inr(r2(c.total))}</b>
+    ${val('item2')&&extra?`<span>+ ${esc(U(val('item2')))} (quotation only)</span><b>₹${inr(extra)}</b>`:''}</div>
+    <div class="words">${rupeeWords(c.price+(val('item2')?extra:0),'q')}</div>` : '<p class="muted" style="margin:0">Enter the price (or pick a model with a saved price) to see the GST breakup.</p>';
+}
+function drawDocCards(){
+  const card=(k,ic,t,sub)=>{ const miss=DOC_NEEDS[k].filter(f=>!val(f)).map(f=>FIELD_LABEL[f]||f);
+    return `<div class="doc"><b>${ic} ${t}</b><span class="muted">${sub}</span>${miss.length?`<span class="miss">Missing: ${esc(miss.join(', '))}</span>`:'<span class="ok">✓ Ready</span>'}<button class="btn ${miss.length?'':'pri'}" onclick="gen('${k}')">Download</button></div>`; };
+  $('#docCards').innerHTML = card('quote','📄','Quotation','Word (.docx)') + card('invoice','🧾','Tax invoice','Excel (.xlsx) · '+(val('invoiceNo')||'no. '+S.invPrefix+S.invNext+' will be assigned')) + card('tr','📋','TR format + Check list','Excel (.xlsx)');
+}
+function saleModel(m){ setF('model',m.name); if(num(m.price)) setF('price',m.price); refresh(); }
+function blankSale(){ return {id:uid(), rel:'S/O', quoteDate:today(), hsn:S.hsn, district:'WEST GODAVARI', imgs:{}, createdAt:Date.now()}; }
+function readForm(){
+  document.querySelectorAll('#main [data-f]').forEach(el=>{
+    const k=el.dataset.f; let v = el.type==='checkbox'? el.checked : el.value;
+    if(el.classList.contains('up') && typeof v==='string') v=v.toUpperCase();
+    CUR[k]=typeof v==='string'? v.trim() : v;
+  });
+  return CUR;
+}
+let _rf=0;
+function setF(k,v,hl=true){ if(v==null||v==='') return; CUR[k]=v; const el=$(`#main [data-f="${k}"]`); if(el){ el.value=v; if(hl) el.classList.add('hl'); validate(el); }
+  if(!_rf) _rf=requestAnimationFrame(()=>{ _rf=0; if($('#steps')) refresh(); }); }
+function modelChanged(){ const m=U($('[data-f="model"]').value); const hit=S.models.find(x=>U(x.name)===m); const p=$('[data-f="price"]'); if(hit && hit.price && !num(p.value)){ p.value=hit.price; p.classList.add('hl'); } refresh(); }
+async function pickStock(id){ if(!id) return; const s=await DB.get('stock',id); if(!s) return; setF('model',s.model); setF('engine',s.engine); setF('chassis',s.chassis); setF('mfg',s.mfg); modelChanged(); }
+async function saveSale(show){
+  readForm();
+  if(!CUR.name){ toast('Enter customer name first'); return false; }
+  // upsert customer
+  const c = {id: CUR.customerId || uid()}; CUST_FIELDS.forEach(k=>c[k]=CUR[k]); c.imgs=CUR.imgs||{}; c.updatedAt=Date.now();
+  const prev = CUR.customerId? await DB.get('customers',CUR.customerId):null; c.createdAt = prev?.createdAt || Date.now();
+  await DB.put('customers',c); CUR.customerId=c.id;
+  // stock status
+  if(CUR.stockId){ const st=await DB.get('stock',CUR.stockId); if(st && (CUR.invoiceNo||CUR.deliveryDate) && st.status!=='SOLD'){ st.status='SOLD'; st.saleId=CUR.id; st.dod=CUR.deliveryDate||''; st.customer=CUR.name; await DB.put('stock',st); } }
+  CUR.updatedAt=Date.now(); CUR._saved=true;
+  await DB.put('sales',CUR);
+  if(show) toast('Saved ✔');
+  return true;
+}
+async function deleteSale(){ if(!confirm('Delete this sale? (customer record is kept)')) return; await DB.del('sales',CUR.id); if(CUR.stockId){const st=await DB.get('stock',CUR.stockId); if(st&&st.saleId===CUR.id){st.status='IN';st.saleId='';await DB.put('stock',st);} } CUR=null; go('sales'); }
+async function pickCustomer(){
+  const cs=(await DB.all('customers')).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(!cs.length){ toast('No saved customers yet — they are added automatically when you save a sale.'); return; }
+  modal('Pick existing customer', `<input id="cq" placeholder="Search name, mobile, village, Aadhaar…" autocomplete="off"><div class="list" id="cl" style="margin-top:8px"></div>`);
+  const draw=q=>{ const Q=U(q); $('#cl').innerHTML=cs.filter(c=>!Q||U([c.name,c.mobile,c.aadhaar,c.village,c.careOf].join(' ')).includes(Q)).slice(0,60)
+    .map(c=>`<div class="item" data-id="${c.id}"><div><b>${esc(c.name)}</b><div class="muted">${esc(c.rel||'')} ${esc(c.careOf||'')} · ${esc(c.village||'')}</div></div><div class="muted" style="text-align:right">${esc(c.mobile||'')}<br>${c.aadhaar?'Aadhaar ••'+esc(String(c.aadhaar).slice(-4)):''}</div></div>`).join('') || '<p class="muted">No match.</p>'; };
+  $('#cq').oninput=e=>draw(e.target.value); draw(''); setTimeout(()=>$('#cq')&&$('#cq').focus(),50);
+  $('#cl').onclick=e=>{ const it=e.target.closest('.item'); if(!it) return; const c=cs.find(x=>x.id===it.dataset.id); closeModal();
+    CUST_FIELDS.forEach(k=>setF(k,c[k],false)); CUR.customerId=c.id; CUR.imgs={...(c.imgs||{}),...(CUR.imgs||{})}; renderThumbs(); $('#saleTitle').textContent=c.name; toast('Loaded '+esc(c.name)); };
+}
+function renderThumbs(){ const im=CUR.imgs||{}; const names={aadhaar:'Aadhaar',aadhaarBack:'Aadhaar back',pan:'PAN'}; $('#thumbs').innerHTML=Object.keys(im).filter(k=>im[k]).map(k=>`<figure><img src="${im[k]}" onclick="openImg('${k}')"><figcaption>${names[k]||k}</figcaption></figure>`).join(''); }
+function openImg(k){ const w=window.open(); if(w) w.document.write('<img style="max-width:100%" src="'+CUR.imgs[k]+'">'); }
+
+/* ============ SCANNING (Aadhaar QR + OCR, PAN OCR) ============ */
+function pickFile(){ return new Promise(res=>{ const f=$('#filePick'); f.value=''; f.onchange=()=>res(f.files[0]||null); f.click(); }); }
+function loadImg(file){ return new Promise((res,rej)=>{ const u=URL.createObjectURL(file); const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=u; }); }
+function toCanvas(img,maxDim){ const s=Math.min(1,maxDim/Math.max(img.naturalWidth,img.naturalHeight)); const c=document.createElement('canvas'); c.width=Math.round(img.naturalWidth*s); c.height=Math.round(img.naturalHeight*s); c.getContext('2d').drawImage(img,0,0,c.width,c.height); return c; }
+function status(m){ const el=$('#scanStatus'); if(el) el.innerHTML=m; }
+
+async function readQR(img){
+  if('BarcodeDetector' in window){ try{ const bd=new BarcodeDetector({formats:['qr_code']}); const r=await bd.detect(img); if(r&&r.length) return r[0].rawValue; }catch(e){} }
+  for(const dim of [1600,2400,1200,900,3200]){
+    const c=toCanvas(img,dim), ctx=c.getContext('2d'), d=ctx.getImageData(0,0,c.width,c.height);
+    try{
+      const lum=new Uint8ClampedArray(c.width*c.height);
+      for(let i=0,j=0;i<d.data.length;i+=4,j++) lum[j]=(d.data[i]*299+d.data[i+1]*587+d.data[i+2]*114)/1000;
+      const src=new ZXing.RGBLuminanceSource(lum,c.width,c.height);
+      const hints=new Map(); hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
+      const r=new ZXing.QRCodeReader().decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(src)),hints);
+      if(r) return r.getText();
+    }catch(e){}
+    try{ const r=jsQR(d.data,c.width,c.height,{inversionAttempts:'attemptBoth'}); if(r&&r.data) return r.data; }catch(e){}
+  }
+  return null;
+}
+function splitCareOf(co){ co=String(co||'').trim(); const m=co.match(/^(S\/O|W\/O|D\/O|C\/O|S\/o|W\/o|D\/o|C\/o)[:\s,]*(.*)$/i); return m? {rel:m[1].toUpperCase(), careOf:m[2].replace(/,$/,'').trim()} : {careOf:co}; }
+function parseAadhaarQR(txt){
+  txt=String(txt).trim();
+  if(txt.startsWith('<') || txt.includes('PrintLetterBarcodeData')){ // old XML QR
+    const x=new DOMParser().parseFromString(txt.replace(/^<\?xml[^>]*\?>/,''),'text/xml').documentElement; const a=k=>x.getAttribute(k)||'';
+    const co=splitCareOf(a('co'));
+    return {name:a('name'), gender:a('gender')==='M'?'MALE':a('gender')==='F'?'FEMALE':'', dob:a('dob')||a('yob'), aadhaar:a('uid').replace(/(\d{4})(?=\d)/g,'$1 '),
+      house:a('house'), street:[a('street'),a('lm')].filter(Boolean).join(', '), village:a('vtc')||a('loc'), mandal:a('subdist'), district:a('dist'), pin:a('pc'), ...co};
+  }
+  if(/^\d{50,}$/.test(txt)){ // Secure QR (big integer -> gzip)
+    let hex=BigInt(txt).toString(16); if(hex.length%2) hex='0'+hex;
+    const bytes=new Uint8Array(hex.length/2); for(let i=0;i<bytes.length;i++) bytes[i]=parseInt(hex.substr(i*2,2),16);
+    let data; try{ data=pako.ungzip(bytes); }catch(e){ data=pako.inflate(bytes); }
+    const parts=[]; let start=0; for(let i=0;i<data.length && parts.length<20;i++){ if(data[i]===255){ parts.push(new TextDecoder('utf-8').decode(data.slice(start,i))); start=i+1; } }
+    let i=0; if(/^V\d/.test(parts[0])) i=1;
+    const P=k=>(parts[i+k]||'').trim();
+    const g=P(4); const co=splitCareOf(P(5));
+    return {last4:P(1).slice(0,4), name:P(2), dob:P(3), gender:g==='M'?'MALE':g==='F'?'FEMALE':g, district:P(6), street:[P(13),P(7)].filter(Boolean).join(', '),
+      house:P(8), village:P(15)||P(9), pin:P(10), mandal:P(14), ...co, _loc:P(9), _state:P(12)};
+  }
+  return null;
+}
+/* OCR = tesseract.js (github.com/naptha/tesseract.js), fully embedded: the WASM core, worker and English
+   data are inert <script> blocks (see build.py) joined into one Blob worker. No network, works from file:// too. */
+let _tess=null, _ocrURL=null;
+function ocrWorkerURL(){
+  if(_ocrURL) return _ocrURL;
+  const t=id=>document.getElementById(id).textContent;
+  const shim=`;(function(){var b=atob(self.__ENG),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);self.__ENG=null;var f=self.fetch;self.fetch=function(r,o){return /eng\\.traineddata/.test(String(r))?Promise.resolve(new Response(u)):f(r,o)};})();\n`;
+  _ocrURL=URL.createObjectURL(new Blob([t('ocr_core'),'\n;self.__ENG="',t('ocr_eng'),'";',shim,t('ocr_worker')],{type:'text/javascript'}));
+  return _ocrURL;
+}
+function ocrBar(p){ const b=$('#ocrBar'); if(!b) return; b.classList.toggle('hide',p==null); if(p!=null) b.firstChild.style.width=Math.round(p*100)+'%'; }
+async function ocr(img){
+  if(typeof Tesseract==='undefined') throw new Error('OCR library missing');
+  if(!_tess){ status('Starting the text reader (a few seconds the first time)…'); ocrBar(0.05);
+    _tess = await Tesseract.createWorker('eng',1,{workerPath:ocrWorkerURL(), workerBlobURL:false, corePath:'embedded.js', langPath:'https://embedded.local', cacheMethod:'none',
+      logger:m=>{ if(m.status==='recognizing text') ocrBar(m.progress); }, errorHandler:()=>{}})
+      .catch(e=>{ _tess=null; ocrBar(null); throw new Error((typeof WebAssembly!=='object'?'this browser is too old':'could not start')+' — use latest Chrome/Edge ('+(e&&e.message||e)+')'); }); }
+  const c=toCanvas(img,2000); const ctx=c.getContext('2d'); const d=ctx.getImageData(0,0,c.width,c.height);
+  for(let i=0;i<d.data.length;i+=4){ const y=(d.data[i]*299+d.data[i+1]*587+d.data[i+2]*114)/1000; d.data[i]=d.data[i+1]=d.data[i+2]=y; } ctx.putImageData(d,0,0);
+  ocrBar(0); try{ const r=await _tess.recognize(c); return r.data.text||''; } finally{ ocrBar(null); }
+}
+function parseAadhaarText(t){
+  const out={}; const lines=t.split(/\n/).map(s=>s.trim()).filter(Boolean);
+  const cands=[...t.replace(/[Oo]/g,'0').matchAll(/(?<!\d[\s]?)\b(\d{4}\s?\d{4}\s?\d{4})\b(?![\s]?\d)/g)].map(m=>m[1].replace(/\s/g,''));
+  const a=cands.find(verhoeff)||cands[0]; if(a) out.aadhaar=a.replace(/(\d{4})(?=\d)/g,'$1 ');
+  const d=t.match(/(\d{2}[\/\-.]\d{2}[\/\-.]\d{4})/); if(d) out.dob=d[1].replace(/[-.]/g,'/');
+  if(/\bFEMALE\b/i.test(t)) out.gender='FEMALE'; else if(/\bMALE\b/i.test(t)) out.gender='MALE';
+  const di=lines.findIndex(l=>/DOB|Birth|YoB|\d{2}\/\d{2}\/\d{4}/i.test(l));
+  if(di>0){ for(let k=di-1;k>=0;k--){ const l=lines[k].replace(/[^A-Za-z .]/g,'').trim(); if(l.length>=4 && /^[A-Za-z .]+$/.test(l) && !/GOVERNMENT|INDIA|AADHAAR|UNIQUE/i.test(l)){ out.name=l.toUpperCase(); break; } } }
+  const co=t.match(/\b([SWDC])\s?\/\s?[O0][:\s,]*([A-Za-z .]{3,40})/i); if(co){ out.rel=co[1].toUpperCase()+'/O'; out.careOf=co[2].trim().toUpperCase(); }
+  const pin=t.match(/\b(5\d{5})\b/); if(pin) out.pin=pin[1];
+  return out;
+}
+function parsePAN(t){
+  const out={}; const toks=t.toUpperCase().split(/[^A-Z0-9]+/);
+  const L={'0':'O','1':'I','5':'S','8':'B','2':'Z'}, D={'O':'0','I':'1','S':'5','B':'8','Z':'2','L':'1'};
+  for(const tok of toks){ if(tok.length!==10) continue; const f=tok.split('').map((ch,i)=> (i<5||i===9)? (L[ch]||ch) : (D[ch]||ch)).join(''); if(/^[A-Z]{5}\d{4}[A-Z]$/.test(f)){ out.pan=f; break; } }
+  const d=t.match(/(\d{2}[\/\-.]\d{2}[\/\-.]\d{4})/); if(d) out.dob=d[1].replace(/[-.]/g,'/');
+  return out;
+}
+async function thumb(img){ const c=toCanvas(img,1200); return c.toDataURL('image/jpeg',0.72); }
+async function scan(kind, file){
+  file=file||await pickFile(); if(!file) return;
+  readForm();
+  status('Reading image…');
+  let img; try{ img=await loadImg(file); }catch(e){ status('Could not open that image.'); return; }
+  CUR.imgs=CUR.imgs||{}; CUR.imgs[kind]=await thumb(img); renderThumbs();
+  const filled=[];
+  const apply=(o,overwrite)=>{ Object.entries(o).forEach(([k,v])=>{ if(k.startsWith('_')||k==='last4'||!v) return; if(overwrite || !CUR[k]){ setF(k, typeof v==='string'&&k!=='dob'?v.toUpperCase():v); filled.push(k);} }); };
+  if(kind==='pan'){
+    try{ status('Reading PAN with OCR…'); const t=await ocr(img); const o=parsePAN(t); apply(o, true); CUR.d_pan=true; const cb=$('[data-f="d_pan"]'); if(cb) cb.checked=true; status(o.pan?`PAN found: <b>${o.pan}</b>. Please verify.`:'Could not read PAN number — type it in.'); }
+    catch(e){ status('OCR failed: '+esc(e.message)+' — type the PAN manually.'); }
+    return;
+  }
+  status('Looking for Aadhaar QR code…');
+  let qr=null, qd=null; try{ qr=await readQR(img); if(qr) qd=parseAadhaarQR(qr); }catch(e){ console.warn(e); }
+  if(qd){ apply(qd,true); }
+  let msg = qd? `✔ QR read: <b>${esc(qd.name)}</b>${qd.last4?` (Aadhaar ends ${qd.last4})`:''}.` : 'QR not found/unreadable — trying text OCR…';
+  status(msg);
+  if(!qd || !String(CUR.aadhaar||'').replace(/\s/g,'').match(/^\d{12}$/)){
+    try{ const t=await ocr(img); const o=parseAadhaarText(t);
+      if(qd && qd.last4 && o.aadhaar && !o.aadhaar.replace(/\s/g,'').endsWith(qd.last4)) delete o.aadhaar;
+      if(qd){ apply({aadhaar:o.aadhaar},false); } else apply(o,false);
+      msg += o.aadhaar? ` Aadhaar no: <b>${o.aadhaar}</b>.` : ' (Aadhaar number not readable — type it.)';
+    }catch(e){ msg += ' OCR: '+esc(e.message); }
+  }
+  CUR.d_aadhaar = !!(CUR.imgs.aadhaar && (CUR.imgs.aadhaarBack || qd)); const cb=$('[data-f="d_aadhaar"]'); if(cb) cb.checked=CUR.d_aadhaar;
+  status(msg+(filled.length?` Filled: ${filled.join(', ')}. Check yellow fields.`:''));
+}
+
+/* ============ DOCUMENT GENERATION ============ */
+let LAST_FILES=[];
+let SAVE_DIR=null;
+async function deliver(blob, name){
+  LAST_FILES.push(new File([blob],name,{type:blob.type}));
+  if(SAVE_DIR){ try{ if((await SAVE_DIR.queryPermission({mode:'readwrite'}))!=='granted') await SAVE_DIR.requestPermission({mode:'readwrite'});
+      const fh=await SAVE_DIR.getFileHandle(name,{create:true}); const w=await fh.createWritable(); await w.write(blob); await w.close(); return 'folder'; }catch(e){ console.warn(e); } }
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},4000); return 'download';
+}
+function afterGen(){
+  const n=LAST_FILES.length; const acts=[];
+  if(navigator.canShare && navigator.canShare({files:LAST_FILES})) acts.push({label:'Share / WhatsApp',pri:1,fn:()=>navigator.share({files:LAST_FILES}).catch(()=>{})});
+  toast(`${n} file${n>1?'s':''} ready${SAVE_DIR?' in your save folder':' (check Downloads)'}.`, acts.length?acts:null);
+}
+function docx(tplKey,data){
+  const zip=new PizZip(b64ToBytes(TPL[tplKey]));
+  const doc=new docxtemplater(zip,{paragraphLoop:true,linebreaks:true,nullGetter:()=>''});
+  doc.render(data);
+  return doc.getZip().generate({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+}
+async function xlsxBlob(wb){ const buf=await wb.xlsx.writeBuffer(); return new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); }
+function calc(s){ const price=num(s.price); const g=num(S.gst)||5; const taxable=r2(price/(1+g/100)); const half=g/2; const cg=taxable*half/100; return {price,g,half,taxable,cg,sg:cg,tax:cg*2,total:taxable+cg*2}; }
+
+async function genQuote(s){
+  const amt1=num(s.price), amt2=num(s.item2amt); const tot=amt1+(s.item2?amt2:0);
+  const blob=docx('quotation',{date:fmtD(s.quoteDate||today()), name:U(s.name), rel:s.rel||'S/O', care_of:U(s.careOf), village:U(s.village), mandal:U(s.mandal), district:U(s.district), mobile:s.mobile||'',
+    hyp: (!s.hyp||U(s.hyp)==='CASH')?'NIL (CASH)':U(s.hyp), words:rupeeWords(tot,'q'),
+    sno1:'1', item1:U(s.model), qty1:'1', rate1:inrQ(amt1), amt1:inrQ(amt1),
+    sno2:s.item2?'2':'', item2:U(s.item2||''), qty2:s.item2?'1':'', rate2:s.item2?inrQ(amt2):'', amt2:s.item2?inrQ(amt2):'', total:inrQ(tot)});
+  s.d_quote=true;
+  return deliver(blob, safeName(`Quotation - ${s.name} - ${fmtD(s.quoteDate||today(),'-')}.docx`));
+}
+async function genInvoice(s){
+  if(!num(s.price)) throw new Error('Enter the price first');
+  if(!s.invoiceNo){ s.invoiceNo = S.invPrefix + S.invNext; S.invNext = (parseInt(S.invNext)||0)+1; await saveSettings(); setF('invoiceNo',s.invoiceNo); }
+  if(!s.invoiceDate){ s.invoiceDate=today(); setF('invoiceDate',s.invoiceDate); }
+  const c=calc(s);
+  const wb=new ExcelJS.Workbook(); await wb.xlsx.load(b64ToBytes(TPL.invoice).buffer);
+  const ws=wb.worksheets[0];
+  const set=(a,v)=>{ ws.getCell(a).value=v; };
+  set('A4',U(S.dealerName)); set('A5',S.addr1); set('A6',S.addr2); set('A7','GSTIN: '+S.gstin); set('A8','Phone : '+S.phone); set('A9','E-mail: '+S.email);
+  set('G4','Invoice No : '+s.invoiceNo); set('I4','Date :'+fmtD(s.invoiceDate,'-'));
+  set('I6','Mode of Payment'+(s.payMode?' : '+s.payMode:''));
+  set('L6',null); set('L7',null); set('M7',null);
+  set('I10','Destination - '+U(s.village));
+  set('A11',U(s.name)); set('A12',(s.rel||'S/O')+' '+U(s.careOf));
+  set('A13',`${U(s.village)} (V) ${U(s.mandal)} (M) `); set('A14',`${U(s.district)} DISTRICT  PIN CODE: ${s.pin||''}`); set('A15','Mobile : '+(s.mobile||''));
+  set('G14','ENG NO : '+U(s.engine)); set('G15','CHASSIS NO: '+U(s.chassis));
+  set('G16', (!s.hyp||U(s.hyp)==='CASH')?'HYPOTHECATION : NIL':'HYPOTHECATION : '+U(s.hyp));
+  set('B18',U(s.model)); set('G18',Number(s.hsn||S.hsn)); set('H18',1); set('I18',c.taxable); set('J18',{formula:'I18',result:c.taxable});
+  set('J33',{formula:'J18+J19+J26',result:c.taxable});
+  set('H34',c.half); set('H35',c.half);
+  set('J34',{formula:`J33*${c.half}%`,result:c.cg}); set('J35',{formula:`J33*${c.half}%`,result:c.sg});
+  set('J36',{formula:'SUM(J33:J35)',result:c.total});
+  set('A37','Amount Chargeable ( in Words ) '+title(rupeeWords(c.total,'q')));
+  set('G38',`CGST ${c.half}%`); set('H38',`SGST${c.half}%`);
+  set('A40',Number(s.hsn||S.hsn)); set('E40',{formula:'J18',result:c.taxable}); set('G40',{formula:'J34',result:c.cg}); set('H40',{formula:'J35',result:c.sg}); set('J40',{formula:'E40+G40+H40',result:c.total});
+  set('E42',{formula:'SUM(E40:E41)',result:c.taxable}); set('G42',{formula:'SUM(G40:G41)',result:c.cg}); set('H42',{formula:'SUM(H40:H41)',result:c.sg}); set('J42',{formula:'SUM(J40:J41)',result:c.total});
+  set('A43',rupeeWords(c.tax,'r'));
+  set('A44','                                                                                                                           For '+U(S.dealerName)); set('G44',U(S.dealerName));
+  wb.calcProperties.fullCalcOnLoad=true;
+  s.d_invoice=true;
+  const no=String(s.invoiceNo).split('/').pop();
+  return deliver(await xlsxBlob(wb), safeName(`${no}. ${s.name} ${s.model} - Tax Invoice.xlsx`));
+}
+async function genTR(s){
+  const wb=new ExcelJS.Workbook(); await wb.xlsx.load(b64ToBytes(TPL.tr).buffer);
+  const tr=wb.getWorksheet('TR FORMAT'), ck=wb.getWorksheet('CHECK LIST');
+  const C=(r,val,sub)=>{ const cell=tr.getCell('C'+r); const orig=String(cell.value??''); const label=orig.trim(); val=String(val??'');
+    if(label){ const lead=orig.length-orig.trimStart().length; cell.value = val + ' '.repeat(Math.max(4, Math.round(lead*0.9) - Math.round(val.length*1.6))) + label + ' ' + String(sub??''); } else cell.value=val; };
+  const c=calc(s);
+  tr.getCell('B1').value='TR FORMAT            DATE OF DEL : '+fmtD(s.deliveryDate);
+  C(3,U(s.name)); C(4,(s.rel||'S/O')+' '+U(s.careOf),s.dob); C(5,U(s.house)); C(6,U(s.street)); C(7,U(s.village));
+  C(8,U(s.mandal),s.pin); C(9,s.mobile,U(s.district)); C(10,s.aadhaar); C(11,U(s.pan)); C(12,U(s.model)); C(13,U(s.engine)); C(14,U(s.chassis));
+  C(15,(!s.hyp||U(s.hyp)==='CASH')?'CASH':'FINANCE - '+U(s.hyp));
+  tr.getCell('C16').value='ISSUE TOKEN  (YES / NO) : '+(s.financeToken||'');
+  C(17,U(s.insCo),U(s.policyNo)); C(18,s.insAmt?inr(num(s.insAmt)):'',fmtD(s.insDate)); C(19,s.invoiceNo); C(20,num(s.price)?inr(c.total):'',s.inv);
+  C(21,s.trAmt?inr(num(s.trAmt)):'',s.fun); C(22,U(s.trNo),s.mmr); C(23,U(s.prNo)); C(24,s.transport); C(25,s.fancy,U(s.rto)); C(26,U(s.appNo)); C(27,s.mfg); C(28,s.dueAmt?inr(num(s.dueAmt)):'');
+  tr.getCell('A29').value='Note: '+(s.notes||'');
+  // Check list
+  const tick=v=>v?'✔':''; const D=(r,v)=>{ ck.getCell('D'+r).value=v||''; };
+  const det=[[3,s.name],[4,(s.rel||'S/O')+' '+U(s.careOf)],[5,s.house],[6,s.street],[7,s.village],[8,s.mandal],[9,s.mobile]];
+  det.forEach(([r,v])=>{ ck.getCell('C'+r).value=tick(v); D(r,U(v)); });
+  const map=[[10,'d_aadhaar',s.aadhaar],[11,'d_pan',U(s.pan)],[12,'d_quote',fmtD(s.quoteDate)],[15,'d_do',''],[16,'d_mmr',s.mmr],[17,'d_invoice',s.invoiceNo],[18,'d_dod',fmtD(s.deliveryDate)],[19,'d_photos',''],[20,'d_ins',U(s.policyNo)],[21,'d_tr',U(s.trNo)],[22,'d_rc',U(s.prNo)],[23,'d_plate',''],[24,'d_other','']];
+  map.forEach(([r,k,v])=>{ ck.getCell('C'+r).value=tick(s[k]||(v&&r!==12)); D(r,v); });
+  ck.getCell('C13').value=tick(s.model); D(13,U(s.model)); ck.getCell('C14').value=tick(s.hyp); D(14,U(s.hyp||'CASH'));
+  ck.getCell('A25').value='Note: '+(s.notes||'');
+  [tr,ck].forEach(w=>{ w.pageSetup.fitToPage=true; w.pageSetup.fitToWidth=1; w.pageSetup.fitToHeight=w===tr?1:0; w.pageSetup.paperSize=9; });
+  ['Sheet2','Sheet3'].forEach(n=>{ const w=wb.getWorksheet(n); if(w) wb.removeWorksheet(w.id); });
+  return deliver(await xlsxBlob(wb), safeName(`TR Format & Check List - ${s.name}.xlsx`));
+}
+async function gen(kind){
+  readForm(); LAST_FILES=[];
+  if(!CUR.name){ toast('Enter customer name first'); return; }
+  try{
+    if(kind==='quote'||kind==='all') await genQuote(CUR);
+    if(kind==='invoice'||kind==='all') await genInvoice(CUR);
+    if(kind==='tr'||kind==='all') await genTR(CUR);
+    DOCS.forEach(([k])=>{ const cb=$(`[data-f="${k}"]`); if(cb) cb.checked=!!CUR[k]; });
+    await saveSale(false);
+    afterGen();
+  }catch(e){ console.error(e); toast('Error: '+esc(e.message||e)); }
+}
+
+/* ---------- Sales register ---------- */
+VIEWS.sales = async () => {
+  const sales=(await DB.all('sales')).sort((a,b)=>(a.deliveryDate||a.invoiceDate||a.quoteDate||'').localeCompare(b.deliveryDate||b.invoiceDate||b.quoteDate||''));
+  $('#main').innerHTML = `<div class="card"><h2>Sales register <span class="row"><input class="search" placeholder="Search…" oninput="filterRows(this.value)"><button class="btn sm" onclick="exportSales()">⬇ Excel</button></span></h2>
+  <div class="tw"><table id="tbl"><thead><tr><th>Date of delivery</th><th>S.No</th><th>Customer details</th><th>Model</th><th>Insurance & finance</th><th>TR+PR+HSRP</th><th>Invoice</th></tr></thead><tbody>
+  ${sales.map((s,i)=>`<tr onclick="go('sale',{id:'${s.id}'})" style="cursor:pointer"><td>${fmtD(s.deliveryDate,'/')||'<span class="muted">—</span>'}</td><td>${i+1}</td>
+   <td><b>${esc(s.name)}</b> ${esc(s.rel||'')} ${esc(s.careOf||'')}<div class="muted">${esc(s.village||'')} (V) ${esc(s.mandal||'')} (M) · ${esc(s.mobile||'')}<br>Eng ${esc(s.engine||'')} · Ch ${esc(s.chassis||'')} · Mfg ${esc(s.mfg||'')}</div></td>
+   <td>${esc(s.model||'')}</td><td>${esc(s.hyp||'')}<div class="muted">${esc(s.insCo||'')}</div></td><td>${esc([s.trNo,s.prNo,s.hsrp].filter(Boolean).join(' / '))}</td><td>${esc(s.invoiceNo||'')}<div class="muted">${fmtD(s.invoiceDate)}</div></td></tr>`).join('') || '<tr><td colspan="7" class="muted">No sales yet.</td></tr>'}
+  </tbody></table></div></div>`;
+};
+function filterRows(q){ q=q.toUpperCase(); document.querySelectorAll('#tbl tbody tr').forEach(r=>r.style.display=r.textContent.toUpperCase().includes(q)?'':'none'); }
+function styleSheet(ws){ ws.getRow(1).font={bold:true}; ws.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE7F5EC'}}; ws.views=[{state:'frozen',ySplit:1}]; ws.eachRow(r=>r.alignment={vertical:'top',wrapText:true}); }
+async function exportSales(){
+  const sales=(await DB.all('sales')).sort((a,b)=>(a.deliveryDate||a.invoiceDate||'').localeCompare(b.deliveryDate||b.invoiceDate||''));
+  const wb=new ExcelJS.Workbook(); const ws=wb.addWorksheet('Sales Register');
+  ws.columns=[['Date of delivery',13],['S.No',6],['Customer',26],['S/O',22],['Village',18],['Mandal',16],['District',16],['Mobile',13],['Aadhaar',16],['PAN',12],['Engine no',14],['Chassis no',22],['Mfg',8],['Model',22],['Price',12],['Hypothecation / Finance',22],['Insurance',20],['Policy no',16],['Invoice no',11],['Invoice date',12],['TR no',14],['PR no',14],['TR+PR+HSRP',16],['Due',10]].map(([h,w])=>({header:h,width:w}));
+  sales.forEach((s,i)=>ws.addRow([fmtD(s.deliveryDate,'/'),i+1,s.name,(s.rel||'')+' '+(s.careOf||''),s.village,s.mandal,s.district,s.mobile,s.aadhaar,s.pan,s.engine,s.chassis,s.mfg,s.model,num(s.price)||'',s.hyp,s.insCo,s.policyNo,s.invoiceNo,fmtD(s.invoiceDate,'/'),s.trNo,s.prNo,s.hsrp,num(s.dueAmt)||'']));
+  styleSheet(ws); LAST_FILES=[]; await deliver(await xlsxBlob(wb),`Sales Register ${fmtD(today(),'-')}.xlsx`); afterGen();
+}
+
+/* ---------- Stock register ---------- */
+const STOCK_F=[['billingDate','Billing date',{type:'date'}],['recDate','Received date',{type:'date'}],['companyInv','Company invoice no',{up:1}],['model','Model',{up:1,list:'models'}],['chassis','Chassis no',{up:1}],['engine','Engine no',{up:1}],['code','Code',{up:1}],['mfg','Mfg month/year',{ph:'MAR-2026'}],['status','Status',{opts:['IN','DEMO','SOLD']}]];
+let STK=null;
+VIEWS.stock = async (arg={}) => {
+  STK = arg.id? await DB.get('stock',arg.id) : {id:uid(),status:'IN',billingDate:today(),recDate:today()};
+  const stock=(await DB.all('stock')).sort((a,b)=>(a.billingDate||'').localeCompare(b.billingDate||''));
+  const f=([k,l,o={}])=>{ const v=STK[k]??''; const inp=o.opts?`<select data-s="${k}">${o.opts.map(x=>`<option ${x===v?'selected':''}>${x}</option>`).join('')}</select>`:`<input data-s="${k}" type="${o.type||'text'}" ${o.list?`list="dl_${o.list}"`:''} class="${o.up?'up':''}" placeholder="${o.ph||''}" value="${esc(v)}">`; return `<div><label>${l}</label>${k==='model'?`<div class="fwrap">${inp}<button class="btn sm" type="button" onclick="pickModel(m=>$('[data-s=model]').value=m.name)">Browse</button></div>`:inp}</div>`; };
+  $('#main').innerHTML = `<datalist id="dl_models">${S.models.map(m=>`<option value="${esc(m.name)}">`).join('')}</datalist>
+  <div class="card"><h2>${arg.id?'Edit tractor':'Add tractor to stock'}</h2><div class="grid">${STOCK_F.map(f).join('')}</div>
+   <div class="row" style="margin-top:12px"><button class="btn pri" onclick="saveStock()">💾 Save</button>${arg.id?`<button class="btn" onclick="go('stock')">Cancel</button><button class="btn ghost" onclick="delStock()">Delete</button>`:''}</div></div>
+  <div class="card"><h2>Stock register <span class="row"><input class="search" placeholder="Search…" oninput="filterRows(this.value)"><button class="btn sm" onclick="exportStock()">⬇ Excel</button></span></h2>
+  <div class="tw"><table id="tbl"><thead><tr><th>S.No</th><th>Billing date</th><th>Rec date</th><th>Invoice no</th><th>Chassis no</th><th>Eng no</th><th>Model</th><th>DOD</th><th>Customer</th><th></th></tr></thead><tbody>
+  ${stock.map((s,i)=>`<tr onclick="go('stock',{id:'${s.id}'})" style="cursor:pointer"><td>${i+1}</td><td>${fmtD(s.billingDate)}</td><td>${fmtD(s.recDate)}</td><td>${esc(s.companyInv||'')}</td><td>${esc(s.chassis||'')}<div class="muted">${esc(s.code?'Code '+s.code:'')} ${esc(s.mfg?'Mfg '+s.mfg:'')}</div></td><td>${esc(s.engine||'')}</td><td>${esc(s.model||'')}</td><td>${fmtD(s.dod)}</td><td>${esc(s.customer||'')}</td><td><span class="chip ${s.status==='SOLD'?'sold':s.status==='DEMO'?'demo':''}">${s.status}</span></td></tr>`).join('') || '<tr><td colspan="10" class="muted">No stock yet.</td></tr>'}
+  </tbody></table></div></div>`;
+};
+async function saveStock(){ document.querySelectorAll('[data-s]').forEach(el=>{ let v=el.value.trim(); if(el.classList.contains('up')) v=v.toUpperCase(); STK[el.dataset.s]=v; }); if(!STK.chassis){ toast('Chassis no is required'); return; } await DB.put('stock',STK); toast('Stock saved ✔'); go('stock'); }
+async function delStock(){ if(confirm('Delete this tractor from stock?')){ await DB.del('stock',STK.id); go('stock'); } }
+async function exportStock(){
+  const stock=(await DB.all('stock')).sort((a,b)=>(a.billingDate||'').localeCompare(b.billingDate||''));
+  const wb=new ExcelJS.Workbook(); const ws=wb.addWorksheet('Stock Register');
+  ws.columns=[['S.No',6],['Billing date',12],['Rec date',12],['Invoice no',18],['Chassis no',24],['Code',12],['Mfg',10],['Eng no',12],['Model',22],['DOD',12],['Customer',26],['Status',8]].map(([h,w])=>({header:h,width:w}));
+  stock.forEach((s,i)=>ws.addRow([i+1,fmtD(s.billingDate),fmtD(s.recDate),s.companyInv,s.chassis,s.code,s.mfg,s.engine,s.model,fmtD(s.dod),s.customer,s.status]));
+  styleSheet(ws); LAST_FILES=[]; await deliver(await xlsxBlob(wb),`Stock Register ${fmtD(today(),'-')}.xlsx`); afterGen();
+}
+
+/* ---------- Customers ---------- */
+VIEWS.customers = async () => {
+  const cs=(await DB.all('customers')).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const sales=await DB.all('sales');
+  $('#main').innerHTML = `<div class="card"><h2>Customers (${cs.length}) <span class="row"><input class="search" placeholder="Search name, mobile, village…" oninput="filterRows(this.value)"><button class="btn sm" onclick="exportCustomers()">⬇ Excel</button></span></h2>
+  <div class="tw"><table id="tbl"><thead><tr><th>Name</th><th>Village / Mandal</th><th>Mobile</th><th>Aadhaar</th><th>PAN</th><th>Sales</th><th></th></tr></thead><tbody>
+  ${cs.map(c=>{ const n=sales.filter(s=>s.customerId===c.id); return `<tr><td><b>${esc(c.name)}</b><div class="muted">${esc(c.rel||'')} ${esc(c.careOf||'')}</div></td><td>${esc(c.village||'')}<div class="muted">${esc(c.mandal||'')}, ${esc(c.district||'')}</div></td><td>${esc(c.mobile||'')}</td><td>${esc(c.aadhaar||'')}</td><td>${esc(c.pan||'')}</td>
+   <td>${n.map(s=>`<a href="#" onclick="go('sale',{id:'${s.id}'});return false">${esc(s.invoiceNo||'Quote')}</a>`).join(', ')}</td><td><button class="btn sm" onclick="go('sale',{customerId:'${c.id}'})">New sale</button></td></tr>`; }).join('') || '<tr><td colspan="7" class="muted">Customers are saved automatically when you save a sale or quotation.</td></tr>'}
+  </tbody></table></div></div>`;
+};
+async function exportCustomers(){
+  const cs=(await DB.all('customers')).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  const wb=new ExcelJS.Workbook(); const ws=wb.addWorksheet('Customers');
+  const cols=SECTIONS[0].f; ws.columns=cols.map(([k,l])=>({header:l,key:k,width:18}));
+  cs.forEach(c=>ws.addRow(Object.fromEntries(cols.map(([k])=>[k,c[k]||'']))));
+  styleSheet(ws); LAST_FILES=[]; await deliver(await xlsxBlob(wb),`Customers ${fmtD(today(),'-')}.xlsx`); afterGen();
+}
+
+/* ---------- Demo letter ---------- */
+VIEWS.demo = async () => {
+  const stock=(await DB.all('stock')).filter(s=>s.status!=='SOLD');
+  const demos=(await DB.all('demos')).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  $('#main').innerHTML = `<datalist id="dl_models">${S.models.map(m=>`<option value="${esc(m.name)}">`).join('')}</datalist>
+  <div class="card"><h2>Demo letter</h2><div class="grid">
+   <div class="full"><label>Pick tractor from stock</label><select id="dm_stock" onchange="demoPick(this.value)"><option value="">— manual —</option>${stock.map(s=>`<option value="${s.id}">${esc(s.model)} · ${esc(s.chassis)} (${s.status})</option>`).join('')}</select></div>
+   <div><label>Date</label><input id="dm_date" type="date" value="${today()}"></div>
+   <div><label>Model</label><div class="fwrap"><input id="dm_model" class="up" list="dl_models"><button class="btn sm" type="button" onclick="pickModel(m=>$('#dm_model').value=m.name)">Browse</button></div></div>
+   <div><label>Serial / Chassis no</label><input id="dm_serial" class="up"></div>
+   <div><label>Village</label><input id="dm_village" class="up"></div>
+   <div><label>Mandal</label><input id="dm_mandal" class="up"></div>
+   <div><label>District</label><input id="dm_district" class="up" value="WEST GODAVARI"></div>
+   <div class="full"><label><input type="checkbox" id="dm_mark" style="width:auto" checked> Mark this tractor as DEMO in stock</label></div>
+  </div><div class="row" style="margin-top:12px"><button class="btn pri" onclick="genDemo()">Generate demo letter</button></div></div>
+  <div class="card"><h2>Demo history</h2><div class="tw"><table><thead><tr><th>Date</th><th>Model</th><th>Serial</th><th>Place</th><th></th></tr></thead><tbody>
+  ${demos.map(d=>`<tr><td>${fmtD(d.date)}</td><td>${esc(d.model)}</td><td>${esc(d.serial)}</td><td>${esc(d.village)} (V) ${esc(d.mandal)} (M)</td><td><button class="btn sm" onclick="returnDemo('${d.id}')">${d.returned?'Returned':'Mark returned'}</button></td></tr>`).join('')||'<tr><td colspan="5" class="muted">No demos yet.</td></tr>'}
+  </tbody></table></div></div>`;
+};
+async function demoPick(id){ if(!id) return; const s=await DB.get('stock',id); $('#dm_model').value=s.model||''; $('#dm_serial').value=s.chassis||''; }
+async function genDemo(){
+  const v=k=>$('#dm_'+k).value.trim().toUpperCase();
+  const d={id:uid(), date:$('#dm_date').value||today(), model:v('model'), serial:v('serial'), village:v('village'), mandal:v('mandal'), district:v('district'), stockId:$('#dm_stock').value};
+  if(!d.model||!d.village){ toast('Enter model and village'); return; }
+  LAST_FILES=[];
+  const blob=docx('demo',{date:fmtD(d.date), village:d.village, mandal:d.mandal, district:d.district.replace(/\s*DISTRICT$/,''), model:d.model, serial:d.serial});
+  await deliver(blob, safeName(`Demo Letter - ${d.village} - ${fmtD(d.date,'-')}.docx`));
+  await DB.put('demos',d);
+  if(d.stockId && $('#dm_mark').checked){ const s=await DB.get('stock',d.stockId); if(s && s.status==='IN'){ s.status='DEMO'; await DB.put('stock',s); } }
+  afterGen(); VIEWS.demo();
+}
+async function returnDemo(id){ const d=await DB.get('demos',id); d.returned=!d.returned; await DB.put('demos',d); if(d.stockId){ const s=await DB.get('stock',d.stockId); if(s && s.status==='DEMO' && d.returned){ s.status='IN'; await DB.put('stock',s);} } VIEWS.demo(); }
+
+/* ---------- Settings ---------- */
+VIEWS.settings = async () => {
+  const F=(k,l)=>`<div><label>${l}</label><input id="st_${k}" value="${esc(S[k])}"></div>`;
+  $('#main').innerHTML = `
+  <div class="card"><h2>Dealer details (used on invoice)</h2><div class="grid">
+   ${F('dealerName','Dealer name')}${F('gstin','GSTIN')}${F('phone','Phone')}${F('email','E-mail')}
+   <div class="full"><label>Address line 1</label><input id="st_addr1" value="${esc(S.addr1)}"></div>
+   <div class="full"><label>Address line 2</label><input id="st_addr2" value="${esc(S.addr2)}"></div>
+   ${F('invPrefix','Invoice no prefix')}${F('invNext','Next invoice number')}${F('gst','GST % (total)')}${F('hsn','Default HSN')}
+  </div><div class="row" style="margin-top:12px"><button class="btn pri" onclick="saveSt()">Save</button></div></div>
+  <div class="card"><h2>Models & your prices (incl. GST)</h2>
+   <p class="muted" style="margin-top:0">All current Powertrac, Farmtrac & Digitrac models are listed. Enter <b>your</b> on-road / invoice price so it fills automatically in a sale. The grey ~range is only an indicative market price.</p>
+   <div class="row" style="margin-bottom:8px"><input id="mfilter" class="search" placeholder="Filter models…" oninput="drawModels()"><button class="btn sm" onclick="S.models.unshift({name:'',price:0});$('#mfilter').value='';drawModels()">＋ Add other model</button></div>
+   <div id="models"></div></div>
+  <div class="card"><h2>Hypothecation banks</h2>
+   <textarea id="st_banks" rows="5">${esc(S.banks.join('\n'))}</textarea>
+   <div class="row" style="margin-top:8px"><input id="ifsc" placeholder="Look up IFSC (e.g. UTIB0000001)" style="max-width:260px" class="up"><button class="btn sm" onclick="ifscLookup()">Find bank</button><span id="ifscOut" class="muted"></span></div>
+   <div class="row" style="margin-top:8px"><button class="btn pri" onclick="saveSt()">Save</button></div></div>
+  <div class="card"><h2>Save location (PC)</h2>
+   <p class="muted">By default files go to your Downloads folder. On a PC in Chrome/Edge you can choose a folder (e.g. Documents\\PowerTrac Docx\\Generated) and files will be saved there directly.</p>
+   <div class="row"><button class="btn" onclick="chooseDir()">Choose folder</button><span class="muted" id="dirName">${SAVE_DIR?'Using: '+esc(SAVE_DIR.name):'Downloads (default)'}</span></div></div>
+  <div class="card"><h2>Backup & move to another device</h2>
+   <p class="muted">All data lives only in this browser. Back up weekly. To move data PC → phone, take a backup here and restore it on the other device.</p>
+   <div class="row"><button class="btn pri" onclick="backup()">⬇ Backup (.json)</button><button class="btn" onclick="restore()">⬆ Restore</button><button class="btn ghost" onclick="wipe()">Erase all data</button></div></div>
+  <div class="card"><h2>Integrations</h2>
+   <p class="muted" style="margin:0">• IFSC lookup above uses the free open Razorpay IFSC service.<br>• SBI / bank loan APIs: no public free API exists for dealers; this slot is ready if your bank gives you API access (YONO / DSA portal).<br>• Next ideas: WhatsApp share (works now via Share button on phone), Google Drive backup, GST e-invoice.</p></div>`;
+  drawModels();
+};
+function drawModels(){ const Q=U($('#mfilter')?.value||'');
+  const rows=S.models.map((m,i)=>[m,i]).filter(([m])=>!Q||U(m.name+' '+(m.hp||'')).includes(Q)).sort(([a],[b])=>(BRANDS.indexOf(a.brand)+1||9)-(BRANDS.indexOf(b.brand)+1||9)||(a.hp||0)-(b.hp||0));
+  $('#models').innerHTML=rows.map(([m,i])=>`<div class="row" style="margin-bottom:6px">${m.cat?`<div style="flex:2;min-width:170px"><b style="font-size:13px">${esc(m.name)}</b><div class="muted">${m.hp} HP · ${m.drive}${m.ref?` · ~₹${lakh(m.ref[0])}–${lakh(m.ref[1])}`:''}</div></div>`:`<input class="up" style="flex:2;min-width:160px" value="${esc(m.name)}" placeholder="Model name" onchange="S.models[${i}].name=this.value.toUpperCase();S.models[${i}].brand=brandOf(this.value)">`}<input type="number" inputmode="numeric" style="flex:1;min-width:110px" value="${m.price||''}" placeholder="Your price ₹" onchange="S.models[${i}].price=num(this.value)">${m.cat?'':`<button class="btn sm ghost" onclick="S.models.splice(${i},1);drawModels()">✕</button>`}</div>`).join('')
+   +`<div class="actionbar" style="position:sticky;margin:8px -14px -14px;border-radius:0 0 var(--radius) var(--radius)"><button class="btn pri" onclick="saveSettings().then(()=>toast('Models & prices saved ✔'))">💾 Save models & prices</button></div>`; }
+async function saveSt(){ ['dealerName','gstin','phone','email','addr1','addr2','invPrefix','hsn'].forEach(k=>S[k]=$('#st_'+k).value.trim()); S.invNext=parseInt($('#st_invNext').value)||S.invNext; S.gst=num($('#st_gst').value)||5; S.banks=$('#st_banks').value.split('\n').map(x=>x.trim().toUpperCase()).filter(Boolean); await saveSettings(); toast('Settings saved ✔'); }
+async function ifscLookup(){ const c=$('#ifsc').value.trim().toUpperCase(); if(!c) return; $('#ifscOut').textContent='Looking up…'; try{ const r=await fetch('https://ifsc.razorpay.com/'+c); if(!r.ok) throw 0; const j=await r.json(); $('#ifscOut').textContent=`${j.BANK}, ${j.BRANCH}, ${j.CITY}`; const name=U(j.BANK); const ta=$('#st_banks'); if(!ta.value.toUpperCase().includes(name)) ta.value=name+'\n'+ta.value; }catch(e){ $('#ifscOut').textContent='Not found / offline'; } }
+async function chooseDir(){ if(!window.showDirectoryPicker){ toast('Folder saving works in Chrome/Edge on PC. On phone, files go to Downloads.'); return; } try{ SAVE_DIR=await showDirectoryPicker({mode:'readwrite'}); await DB.put('kv',{id:'saveDir',h:SAVE_DIR}); $('#dirName').textContent='Using: '+SAVE_DIR.name; }catch(e){} }
+async function backup(){ const out={app:'dealerdesk',v:1,at:new Date().toISOString()}; for(const s of ['kv','customers','stock','sales','demos']) out[s]=(await DB.all(s)).filter(x=>x.id!=='saveDir'); LAST_FILES=[]; await deliver(new Blob([JSON.stringify(out)],{type:'application/json'}),`DealerDesk Backup ${fmtD(today(),'-')}.json`); afterGen(); }
+function restore(){ const f=$('#restorePick'); f.value=''; f.onchange=async()=>{ const file=f.files[0]; if(!file) return; try{ const j=JSON.parse(await file.text()); if(j.app!=='dealerdesk') throw new Error('Not a Dealer Desk backup');
+  if(!confirm('Merge this backup into the data on this device? (records with the same ID are replaced)')) return;
+  for(const s of ['kv','customers','stock','sales','demos']) for(const o of (j[s]||[])) await DB.put(s,o);
+  await loadSettings(); toast('Restored ✔'); go('home'); }catch(e){ toast('Restore failed: '+esc(e.message)); } }; f.click(); }
+async function wipe(){ if(!confirm('Erase ALL customers, sales, stock and settings on this device?')) return; if(prompt('Type ERASE to confirm')!=='ERASE') return; for(const s of ['kv','customers','stock','sales','demos']) await DB.clear(s); await loadSettings(); go('home'); }
+
+/* ---------- theme ---------- */
+function toggleTheme(){ const r=document.documentElement; const cur=r.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'); r.dataset.theme=cur==='dark'?'light':'dark'; try{localStorage.setItem('theme',r.dataset.theme)}catch(e){} }
+try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.dataset.theme=t; }catch(e){}
+
+/* ---------- boot ---------- */
+(async()=>{
+  try{ await DB.open(); }catch(e){ document.body.innerHTML='<p style="padding:20px">This browser blocked local storage. Open the file in Chrome or Edge.</p>'; return; }
+  await loadSettings();
+  try{ const d=await DB.get('kv','saveDir'); if(d&&d.h) SAVE_DIR=d.h; }catch(e){}
+  if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
+  renderNav(); go('home');
+})();
+</script>
+</body>
+</html>

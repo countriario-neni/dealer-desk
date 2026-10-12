@@ -1,0 +1,9 @@
+# private / generated — never publish
+CLAUDE.md
+Dealer Desk.html
+source/node_modules/
+source/dist/
+source/out/
+source/shots/
+source/*.png
+*.json.bak
