@@ -802,8 +802,12 @@ async function genQuotePdf(s){
   if(tl.length>2) T(tl.slice(2).join(' '), 63, ys[4]+25.6+28.8, fit(tl.slice(2).join(' '),247));
   T('For '+dn, 316, ys[4]+49.4, fit('For '+dn, 560-316));
   const sig=await DB.get('kv','signature');   // an uploaded image replaces the built-in signature & stamp (cut from the owner's example)
-  if(S.pdfSign!==false){ const im=await pdf.embedPng(sig&&sig.png ? b64ToBytes(sig.png.split(',')[1]) : await asset('signature')); const k=Math.min(150/im.width, 92/im.height);
-    pg.drawImage(im,{x:402-im.width*k/2, y:H-(ys[4]+40.4)-im.height*k/2, width:im.width*k, height:im.height*k}); }
+  if(S.pdfSign!==false){   // ink is multiplied into the page like real ink: printed text under it stays black
+    const ink={blendMode:PDFLib.BlendMode.Multiply, opacity:0.95};
+    if(sig&&sig.png){ const im=await pdf.embedPng(b64ToBytes(sig.png.split(',')[1])); const k=Math.min(150/im.width, 92/im.height);
+      pg.drawImage(im,{x:402-im.width*k/2, y:H-(ys[4]+40.4)-im.height*k/2, width:im.width*k, height:im.height*k, ...ink}); }
+    else { const im=await pdf.embedPng(await asset('signature'));   // built-in: placed exactly as on the owner's signed quotation
+      pg.drawImage(im,{x:323.8, y:H-(ys[4]+1.9)-74.2, width:177.7, height:74.2, ...ink}); } }
   [['1.','Price of Unit/spare are label'],['2.','Changed without NOTICE and chargeable at prevailing at the time of delivery.'],['3.','Delivery Unit/spare will be ex-show room.'],
    ['4.','Delivery of according to the availability and against full payment by cash/Demand Draft on'],['','Any Nationalized bank payable at in favour of '+dn+'.']]
    .forEach(([n,t],i)=>{ const b=ys[4]+97.6+i*14.4; T(n,82,b); T(t,100,b,fit(t,560-100)); });

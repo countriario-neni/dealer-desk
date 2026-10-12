@@ -161,7 +161,7 @@ input.bad{border-color:#d92d20}
 const TPL = {};
 /* Web build: the page is small and each heavy part loads the first time it is needed (then cached on the device by sw.js).
    Single-file build (Dealer Desk.html): everything is already inline, so need()/asset() resolve at once. */
-const BUILD = {"web": true, "libs": {"scan": ["lib/jsQR.js", "lib/pako.min.js", "lib/index.min.js", "lib/tesseract.min.js"], "docx": ["lib/pizzip.min.js", "lib/docxtemplater.min.js"], "xlsx": ["lib/exceljs.min.js"], "pdf": ["lib/pdf-lib.min.js", "lib/fontkit.umd.min.js"]}, "assets": {"quotation": "assets/quotation.docx", "demo": "assets/demo.docx", "invoice": "assets/invoice.xlsx", "tr": "assets/tr.xlsx", "letterhead": "assets/letterhead.pdf", "font": "assets/Carlito-Bold.ttf", "signature": "assets/signature.png"}, "ocr": {"core": "ocr/core.txt", "worker": "ocr/worker.txt", "eng": "ocr/eng.txt"}, "v": "dd74c1d76d"};
+const BUILD = {"web": true, "libs": {"scan": ["lib/jsQR.js", "lib/pako.min.js", "lib/index.min.js", "lib/tesseract.min.js"], "docx": ["lib/pizzip.min.js", "lib/docxtemplater.min.js"], "xlsx": ["lib/exceljs.min.js"], "pdf": ["lib/pdf-lib.min.js", "lib/fontkit.umd.min.js"]}, "assets": {"quotation": "assets/quotation.docx", "demo": "assets/demo.docx", "invoice": "assets/invoice.xlsx", "tr": "assets/tr.xlsx", "letterhead": "assets/letterhead.pdf", "font": "assets/Carlito-Bold.ttf", "signature": "assets/signature.png"}, "ocr": {"core": "ocr/core.txt", "worker": "ocr/worker.txt", "eng": "ocr/eng.txt"}, "v": "f1300b3fcf"};
 const _need={}, _asset={};
 const loadScript = src => new Promise((res,rej)=>{ const el=document.createElement('script'); el.src=src+'?v='+BUILD.v; el.onload=res; el.onerror=()=>{ el.remove(); rej(new Error('could not load '+src+' — check the internet connection')); }; document.head.appendChild(el); });
 function need(...groups){ return Promise.all(groups.map(g=> _need[g] = _need[g] || (BUILD.web ? BUILD.libs[g].reduce((pr,f)=>pr.then(()=>loadScript(f)),Promise.resolve()) : Promise.resolve()).catch(e=>{ delete _need[g]; throw e; }))); }
@@ -802,8 +802,12 @@ async function genQuotePdf(s){
   if(tl.length>2) T(tl.slice(2).join(' '), 63, ys[4]+25.6+28.8, fit(tl.slice(2).join(' '),247));
   T('For '+dn, 316, ys[4]+49.4, fit('For '+dn, 560-316));
   const sig=await DB.get('kv','signature');   // an uploaded image replaces the built-in signature & stamp (cut from the owner's example)
-  if(S.pdfSign!==false){ const im=await pdf.embedPng(sig&&sig.png ? b64ToBytes(sig.png.split(',')[1]) : await asset('signature')); const k=Math.min(150/im.width, 92/im.height);
-    pg.drawImage(im,{x:402-im.width*k/2, y:H-(ys[4]+40.4)-im.height*k/2, width:im.width*k, height:im.height*k}); }
+  if(S.pdfSign!==false){   // ink is multiplied into the page like real ink: printed text under it stays black
+    const ink={blendMode:PDFLib.BlendMode.Multiply, opacity:0.95};
+    if(sig&&sig.png){ const im=await pdf.embedPng(b64ToBytes(sig.png.split(',')[1])); const k=Math.min(150/im.width, 92/im.height);
+      pg.drawImage(im,{x:402-im.width*k/2, y:H-(ys[4]+40.4)-im.height*k/2, width:im.width*k, height:im.height*k, ...ink}); }
+    else { const im=await pdf.embedPng(await asset('signature'));   // built-in: placed exactly as on the owner's signed quotation
+      pg.drawImage(im,{x:323.8, y:H-(ys[4]+1.9)-74.2, width:177.7, height:74.2, ...ink}); } }
   [['1.','Price of Unit/spare are label'],['2.','Changed without NOTICE and chargeable at prevailing at the time of delivery.'],['3.','Delivery Unit/spare will be ex-show room.'],
    ['4.','Delivery of according to the availability and against full payment by cash/Demand Draft on'],['','Any Nationalized bank payable at in favour of '+dn+'.']]
    .forEach(([n,t],i)=>{ const b=ys[4]+97.6+i*14.4; T(n,82,b); T(t,100,b,fit(t,560-100)); });
