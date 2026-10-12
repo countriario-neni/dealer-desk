@@ -14,6 +14,6 @@ tpl={k:base64.b64encode(open(f"tpl/{k}.{e}","rb").read()).decode() for k,e in [(
 # PDF quotation: scanned letterhead page + Carlito Bold (OFL, metric-compatible with Calibri)
 tpl.update({k:base64.b64encode(open(f,"rb").read()).decode() for k,f in [("letterhead","assets/letterhead.pdf"),("font","assets/Carlito-Bold.ttf")]})
 models=json.load(open("models.json",encoding="utf-8"))
-h=open("app.html",encoding="utf-8").read().replace("<!--LIBS-->",tags).replace("__TPL_JSON__",json.dumps(tpl)).replace("__MODELS_JSON__",json.dumps(models))
+h=open("app.html",encoding="utf-8").read().replace("<!--LIBS-->",tags).replace("__TPL_JSON__",json.dumps(tpl)).replace("__MODELS_JSON__",json.dumps(models)).replace("__GAS_SCRIPT__",json.dumps(open("cloud/Code.gs",encoding="utf-8").read()).replace("</","<\\/"))
 import os; os.makedirs("dist",exist_ok=True); open("dist/Dealer Desk.html","w",encoding="utf-8").write(h)
 print(len(h)//1024,"KB")

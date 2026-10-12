@@ -56,6 +56,27 @@ inside each device's browser. (The page is ~10 MB because the text reader is bui
 it downloads once, then opens from the browser cache.)
 On phone, after generating, tap "Share / WhatsApp" to send files.
 
+COMPANY CLOUD (Google Sheet) - all phones & PCs share one set of data
+Owner, once:
+ 1. Create a new Google Sheet in your Google account (e.g. "Dealer Desk Data").
+ 2. In the sheet: Extensions -> Apps Script -> delete what is there -> paste the script
+    (Dealer Desk -> Settings -> Company cloud -> "Copy script") -> Save.
+ 3. Deploy -> New deployment -> Web app. Execute as: Me. Who has access: Anyone.
+    Deploy -> Authorize (allow the Google permissions) -> copy the Web app URL.
+ 4. Dealer Desk -> Settings -> Company cloud: paste the URL, type your name -> Connect.
+    Everything already on this device is uploaded to the sheet.
+ 5. "Share company link with staff" -> send it on WhatsApp to staff ONLY.
+Staff: open the company link once -> type their name -> done. That phone/PC now saves
+to the sheet automatically (top bar shows "Up to date"). Works offline too: changes wait
+on the phone and are sent when the internet is back.
+History tab (in the app) and the "History" tab of the sheet show who opened the app,
+who added / changed / deleted what, from which device and when.
+The sheet has tabs Customers, Sales, Stock, Demos, Settings; Aadhaar/PAN photos are in
+the Google Drive folder "Dealer Desk Photos". Only your Google account can open them.
+IMPORTANT: there is no password - anyone who has the company link can see and change
+all data. Never post it outside the company. If it leaks: in Apps Script, Deploy ->
+Manage deployments -> archive it, make a New deployment, connect again, share the new link.
+
 DATA & BACKUP  (important)
 - Data is stored only in that browser on that device. Clearing browser data erases it.
 - Settings -> Backup weekly (save the .json to Google Drive / pen drive).

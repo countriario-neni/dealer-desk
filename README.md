@@ -9,7 +9,8 @@ and Demo Letter (.docx), plus Customer, Sales and Stock registers.
 - Works on any PC or phone browser (Chrome / Edge recommended), fully offline once loaded.
 - Aadhaar QR auto-fill; Aadhaar number / PAN text reading with [Tesseract.js](https://github.com/naptha/tesseract.js),
   bundled inside the page — images never leave the device.
-- All data stays in that device's browser (IndexedDB). Use Settings → Backup to move or protect it.
+- Data stays in each device's browser (IndexedDB). Optional company cloud: one private Google Sheet shared by all devices
+  that open the company link, with a history of who did what (`source/cloud/Code.gs`, setup in Settings).
 - No customer data is stored in this repository.
 
 Developer: edit `source/app.html` (model list: `source/models.json`), then

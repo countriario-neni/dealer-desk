@@ -145,6 +145,7 @@ input.bad{border-color:#d92d20}
     <h1 id="hdrName">Dealer Desk</h1>
     <small>Quotation · Invoice · TR · Demo · Registers</small>
   </div>
+  <button class="btn sm ghost hide" id="cloudChip" style="color:#fff;border-color:rgba(255,255,255,.4)" onclick="cloudSync().then(()=>toast('Company sheet is up to date ✔'))" title="Company cloud">☁</button>
   <button class="btn sm ghost" style="color:#fff;border-color:rgba(255,255,255,.4)" onclick="toggleTheme()" title="Theme">◐</button>
 </header>
 <nav id="nav"></nav></div>
@@ -10681,8 +10682,9 @@ const DB = {
   tx(s,m){ return DB.db.transaction(s,m).objectStore(s); },
   all(s){ return new Promise((res,rej)=>{ const q=DB.tx(s,'readonly').getAll(); q.onsuccess=()=>res(q.result||[]); q.onerror=()=>rej(q.error); }); },
   get(s,id){ return new Promise((res,rej)=>{ const q=DB.tx(s,'readonly').get(id); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); },
-  put(s,o){ return new Promise((res,rej)=>{ const q=DB.tx(s,'readwrite').put(o); q.onsuccess=()=>res(o); q.onerror=()=>rej(q.error); }); },
-  del(s,id){ return new Promise((res,rej)=>{ const q=DB.tx(s,'readwrite').delete(id); q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); }); },
+  put(s,o,raw){ const sync=!raw && (CLOUD_STORES.includes(s) || (s==='kv'&&o.id==='settings')); if(sync) o.updatedAt=Date.now();
+    return new Promise((res,rej)=>{ const q=DB.tx(s,'readwrite').put(o); q.onsuccess=()=>{ res(o); if(sync) cloudSoon(); }; q.onerror=()=>rej(q.error); }); },
+  del(s,id,raw){ return new Promise((res,rej)=>{ const q=DB.tx(s,'readwrite').delete(id); q.onsuccess=async()=>{ if(!raw && CLOUD_STORES.includes(s)){ const t=(await DB.get('kv','tombs'))||{id:'tombs',list:{}}; t.list[s+'/'+id]=Date.now(); await DB.put('kv',t,true); cloudSoon(); } res(); }; q.onerror=()=>rej(q.error); }); },
   clear(s){ return new Promise((res,rej)=>{ const q=DB.tx(s,'readwrite').clear(); q.onsuccess=()=>res(); q.onerror=()=>rej(q.error); }); },
 };
 const DEFAULT_SETTINGS = {
@@ -10749,7 +10751,7 @@ const INS_COS = ['UNITED INDIA INSURANCE','THE NEW INDIA ASSURANCE','NATIONAL IN
 /* ============ navigation ============ */
 const TABS = [['home','🏠 Home'],['sale','🧾 New sale'],['sales','📒 Sales register'],['stock','🚜 Stock register'],['customers','👥 Customers'],['demo','📝 Demo letter'],['settings','⚙️ Settings']];
 let TAB='home';
-function renderNav(){ $('#nav').innerHTML = TABS.map(([k,l])=>`<button class="${k===TAB?'on':''}" onclick="go('${k}')">${l}</button>`).join(''); }
+function renderNav(){ $('#nav').innerHTML = [...TABS.slice(0,-1), ...(CLOUD?[['history','🕘 History']]:[]), TABS[TABS.length-1]].map(([k,l])=>`<button class="${k===TAB?'on':''}" onclick="go('${k}')">${l}</button>`).join(''); }
 async function go(tab, arg){ TAB=tab; renderNav(); closeModal(); comboClose(); $('#actionbar').classList.add('hide'); $('#main').oninput=null; window.scrollTo(0,0); await VIEWS[tab](arg); }
 
 /* ============ modal + pickers ============ */
@@ -11031,7 +11033,9 @@ async function customerModal(cb, cs){
   $('#cq').oninput=e=>draw(e.target.value); draw(''); setTimeout(()=>$('#cq')&&$('#cq').focus(),50);
   $('#cl').onclick=e=>{ const it=e.target.closest('.item'); if(!it) return; closeModal(); cb(cs.find(x=>x.id===it.dataset.id)); };
 }
-function renderThumbs(){ const im=CUR.imgs||{}; const names={aadhaar:'Aadhaar',aadhaarBack:'Aadhaar back',pan:'PAN'}; $('#thumbs').innerHTML=Object.keys(im).filter(k=>im[k]).map(k=>`<figure><img src="${im[k]}" onclick="openImg('${k}')"><figcaption>${names[k]||k}</figcaption></figure>`).join(''); }
+function renderThumbs(){ const im=CUR.imgs||{}; const names={aadhaar:'Aadhaar',aadhaarBack:'Aadhaar back',pan:'PAN'}; $('#thumbs').innerHTML=Object.keys(im).filter(k=>im[k]).map(k=>String(im[k]).startsWith('drive:')
+  ? `<figure><a class="btn sm" href="https://drive.google.com/file/d/${esc(String(im[k]).slice(6))}/view" target="_blank" rel="noopener">📎 ${names[k]||k}</a><figcaption>in Google Drive</figcaption></figure>`
+  : `<figure><img src="${im[k]}" onclick="openImg('${k}')"><figcaption>${names[k]||k}</figcaption></figure>`).join(''); }
 function openImg(k){ const w=window.open(); if(w) w.document.write('<img style="max-width:100%" src="'+CUR.imgs[k]+'">'); }
 
 /* ============ SCANNING (Aadhaar QR + OCR, PAN OCR) ============ */
@@ -11284,6 +11288,7 @@ async function genQuote(s){
 }
 async function genInvoice(s){
   if(!num(s.price)) throw new Error('Enter the price first');
+  if(!s.invoiceNo && CLOUD && navigator.onLine){ await cloudSync(); await cloudSync(); }   // latest invoice number from other devices
   if(!s.invoiceNo){ s.invoiceNo = S.invPrefix + S.invNext; S.invNext = (parseInt(S.invNext)||0)+1; await saveSettings(); setF('invoiceNo',s.invoiceNo); }
   if(!s.invoiceDate){ s.invoiceDate=today(); setF('invoiceDate',s.invoiceDate); }
   const c=calc(s);
@@ -11488,8 +11493,9 @@ VIEWS.settings = async () => {
   <div class="card"><h2>Save location (PC)</h2>
    <p class="muted">By default files go to your Downloads folder. On a PC in Chrome/Edge you can choose a folder (e.g. Documents\\PowerTrac Docx\\Generated) and files will be saved there directly.</p>
    <div class="row"><button class="btn" onclick="chooseDir()">Choose folder</button><span class="muted" id="dirName">${SAVE_DIR?'Using: '+esc(SAVE_DIR.name):'Downloads (default)'}</span></div></div>
+  ${cloudCard()}
   <div class="card"><h2>Backup & move to another device</h2>
-   <p class="muted">All data lives only in this browser. Back up weekly. To move data PC → phone, take a backup here and restore it on the other device.</p>
+   <p class="muted">${CLOUD?'This device also keeps its own copy. A backup file is an extra safety copy.':'All data lives only in this browser. Back up weekly. To move data PC → phone, take a backup here and restore it on the other device — or connect the Company cloud above.'}</p>
    <div class="row"><button class="btn pri" onclick="backup()">⬇ Backup (.json)</button><button class="btn" onclick="restore()">⬆ Restore</button><button class="btn ghost" onclick="wipe()">Erase all data</button></div></div>
   <div class="card"><h2>Integrations</h2>
    <p class="muted" style="margin:0">• IFSC lookup above uses the free open Razorpay IFSC service.<br>• SBI / bank loan APIs: no public free API exists for dealers; this slot is ready if your bank gives you API access (YONO / DSA portal).<br>• Next ideas: WhatsApp share (works now via Share button on phone), Google Drive backup, GST e-invoice.</p></div>`;
@@ -11506,12 +11512,121 @@ async function removeSig(){ await DB.del('kv','signature'); drawSig(); }
 async function saveSt(){ ['dealerName','gstin','phone','email','addr1','addr2','invPrefix','hsn'].forEach(k=>S[k]=$('#st_'+k).value.trim()); S.defDistrict=U($('#st_defDistrict').value); S.invNext=parseInt($('#st_invNext').value)||S.invNext; S.gst=num($('#st_gst').value)||5; S.banks=$('#st_banks').value.split('\n').map(x=>x.trim().toUpperCase()).filter(Boolean); await saveSettings(); toast('Settings saved ✔'); }
 async function ifscLookup(){ const c=$('#ifsc').value.trim().toUpperCase(); if(!c) return; $('#ifscOut').textContent='Looking up…'; try{ const r=await fetch('https://ifsc.razorpay.com/'+c); if(!r.ok) throw 0; const j=await r.json(); $('#ifscOut').textContent=`${j.BANK}, ${j.BRANCH}, ${j.CITY}`; const name=U(j.BANK); const ta=$('#st_banks'); if(!ta.value.toUpperCase().includes(name)) ta.value=name+'\n'+ta.value; }catch(e){ $('#ifscOut').textContent='Not found / offline'; } }
 async function chooseDir(){ if(!window.showDirectoryPicker){ toast('Folder saving works in Chrome/Edge on PC. On phone, files go to Downloads.'); return; } try{ SAVE_DIR=await showDirectoryPicker({mode:'readwrite'}); await DB.put('kv',{id:'saveDir',h:SAVE_DIR}); $('#dirName').textContent='Using: '+SAVE_DIR.name; }catch(e){} }
-async function backup(){ const out={app:'dealerdesk',v:1,at:new Date().toISOString()}; for(const s of ['kv','customers','stock','sales','demos']) out[s]=(await DB.all(s)).filter(x=>x.id!=='saveDir'); LAST_FILES=[]; await deliver(new Blob([JSON.stringify(out)],{type:'application/json'}),`DealerDesk Backup ${fmtD(today(),'-')}.json`); afterGen(); }
+async function backup(){ const out={app:'dealerdesk',v:1,at:new Date().toISOString()}; for(const s of ['kv','customers','stock','sales','demos']) out[s]=(await DB.all(s)).filter(x=>!['saveDir','cloud','cloudstate','tombs'].includes(x.id)); LAST_FILES=[]; await deliver(new Blob([JSON.stringify(out)],{type:'application/json'}),`DealerDesk Backup ${fmtD(today(),'-')}.json`); afterGen(); }
 function restore(){ const f=$('#restorePick'); f.value=''; f.onchange=async()=>{ const file=f.files[0]; if(!file) return; try{ const j=JSON.parse(await file.text()); if(j.app!=='dealerdesk') throw new Error('Not a Dealer Desk backup');
   if(!confirm('Merge this backup into the data on this device? (records with the same ID are replaced)')) return;
-  for(const s of ['kv','customers','stock','sales','demos']) for(const o of (j[s]||[])) await DB.put(s,o);
+  for(const s of ['kv','customers','stock','sales','demos']) for(const o of (j[s]||[])){ if(['cloud','cloudstate','tombs'].includes(o.id)) continue; o.updatedAt=o.updatedAt||Date.now(); await DB.put(s,o,true); }
+  cloudSoon();
   await loadSettings(); toast('Restored ✔'); go('home'); }catch(e){ toast('Restore failed: '+esc(e.message)); } }; f.click(); }
-async function wipe(){ if(!confirm('Erase ALL customers, sales, stock and settings on this device?')) return; if(prompt('Type ERASE to confirm')!=='ERASE') return; for(const s of ['kv','customers','stock','sales','demos']) await DB.clear(s); await loadSettings(); go('home'); }
+async function wipe(){ if(!confirm('Erase ALL customers, sales, stock and settings on this device?'+(CLOUD?' (the company sheet is NOT erased; it will download again)':''))) return; if(prompt('Type ERASE to confirm')!=='ERASE') return; for(const s of ['kv','customers','stock','sales','demos']) await DB.clear(s); if(CLOUD) await DB.put('kv',CLOUD,true); await loadSettings(); go('home'); }
+
+/* ============ Company cloud: one Google Sheet for every device that opens the company link ============
+   No login: the sheet's Apps Script URL travels in the company link (#cloud=…), never in the public app.
+   Every record carries updatedAt; newest wins. Each device asks for the person's name once → History sheet. */
+const CLOUD_STORES=['customers','sales','stock','demos'];
+const GAS = "/* Dealer Desk \u2014 company cloud on a Google Sheet.\n   Setup (once, by the owner):\n     1. Create a new Google Sheet (e.g. \"Dealer Desk Data\") in the owner's Google account.\n     2. Extensions \u2192 Apps Script \u2192 delete everything there, paste this whole file, Save.\n     3. Deploy \u2192 New deployment \u2192 type \"Web app\" \u2192 Execute as: Me, Who has access: Anyone \u2192 Deploy \u2192 Authorize.\n     4. Copy the Web app URL (https://script.google.com/macros/s/\u2026/exec) into Dealer Desk \u2192 Settings \u2192 Company cloud.\n   The sheet stays private to the owner's Google account; the app talks to it only through this script.\n   Tabs: one per record type (readable columns + a \"json\" column the app reads back), and \"History\"\n   (who did what, from which device, when). Photos go to the Drive folder \"Dealer Desk Photos\". */\n\nvar STORES = {\n  customers: ['name', 'rel', 'careOf', 'mobile', 'house', 'street', 'village', 'mandal', 'district', 'pin', 'dob', 'gender', 'aadhaar', 'pan'],\n  sales: ['name', 'mobile', 'village', 'mandal', 'district', 'model', 'engine', 'chassis', 'price', 'hyp', 'quoteDate', 'invoiceNo', 'invoiceDate', 'deliveryDate', 'insCo', 'policyNo', 'trNo', 'prNo', 'dueAmt'],\n  stock: ['model', 'chassis', 'engine', 'mfg', 'status', 'billingDate', 'recDate', 'companyInv', 'customer', 'dod'],\n  demos: ['date', 'model', 'serial', 'village', 'mandal', 'district', 'returned'],\n  settings: ['dealerName', 'invPrefix', 'invNext']\n};\nvar BASE = ['id', 'updatedAt', 'savedAt', 'savedBy', 'device', 'deleted'];\nvar HISTORY = ['time', 'person', 'device', 'action', 'what', 'id', 'details'];\nvar PHOTOS = 'Dealer Desk Photos';\n\nfunction doGet(e) {\n  var p = (e && e.parameter) || {};\n  if (p.action === 'history') return out_({ ok: true, history: history_(+p.n || 300) });\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  return out_({ ok: true, app: 'dealerdesk', sheet: ss.getName(), sheetUrl: ss.getUrl() });\n}\n\nfunction doPost(e) {\n  var req = JSON.parse(e.postData.contents);\n  var lock = LockService.getScriptLock();\n  lock.waitLock(30000);\n  try {\n    if (req.action === 'history') return out_({ ok: true, history: history_(+req.n || 300) });\n    if (req.action !== 'sync') return out_({ ok: false, error: 'unknown action' });\n    var now = Date.now(), user = String(req.user || 'Unknown').slice(0, 60), device = String(req.device || '?').slice(0, 80);\n    var cache = {}, log = [];\n    if (req.hello) log.push([new Date(now), user, device, 'opened the app', '', '', '']);\n    (req.changes || []).forEach(function (c) {\n      if (!STORES[c.store]) return;\n      var act = save_(cache, c, now, user, device);\n      if (act) log.push([new Date(now), user, device, act, c.store, String(c.id), summary_(c)]);\n    });\n    if (log.length) {\n      var h = sheet_('History', HISTORY);\n      h.getRange(h.getLastRow() + 1, 1, log.length, HISTORY.length).setValues(log);\n    }\n    return out_({ ok: true, serverTime: now, changes: since_(cache, +req.since || 0) });\n  } finally {\n    lock.releaseLock();\n  }\n}\n\nfunction out_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }\n\nfunction sheet_(name, head) {\n  var ss = SpreadsheetApp.getActiveSpreadsheet(), sh = ss.getSheetByName(name);\n  if (!sh) { sh = ss.insertSheet(name); sh.appendRow(head); sh.setFrozenRows(1); }\n  return sh;\n}\n\nfunction table_(cache, store) {\n  if (!cache[store]) {\n    var head = BASE.concat(STORES[store], ['json']), sh = sheet_(store, head), vals = sh.getDataRange().getValues(), idx = {};\n    for (var i = 1; i < vals.length; i++) idx[String(vals[i][0])] = i;\n    cache[store] = { sh: sh, vals: vals, idx: idx, width: head.length };\n  }\n  return cache[store];\n}\n\n// Saves one record if it is newer than what the sheet has. Returns the history action, or null if nothing changed.\nfunction save_(cache, c, now, user, device) {\n  var t = table_(cache, c.store), row = t.idx[String(c.id)], jsonCol = t.width - 1;\n  if (row && +t.vals[row][1] >= +c.updatedAt) return null;\n  if (c.deleted && row) { try { c.data = JSON.parse(t.vals[row][jsonCol]); } catch (err) {} }  // so History says what was deleted\n  var d = c.deleted ? {} : (c.data || {});\n  if (!c.deleted && d.imgs) {\n    var prev = {};\n    try { prev = (row && t.vals[row][jsonCol]) ? (JSON.parse(t.vals[row][jsonCol]).imgs || {}) : {}; } catch (err) {}\n    d.imgs = photos_(c.store, c.id, d.imgs, prev);\n  }\n  var line = [String(c.id), +c.updatedAt, now, user, device, c.deleted ? 'YES' : '']\n    .concat(STORES[c.store].map(function (k) { var v = d[k]; return v == null ? '' : (typeof v === 'object' ? JSON.stringify(v) : v); }))\n    .concat([c.deleted ? '' : JSON.stringify(d)]);\n  if (row) { t.sh.getRange(row + 1, 1, 1, line.length).setValues([line]); t.vals[row] = line; }\n  else { t.sh.appendRow(line); t.vals.push(line); t.idx[String(c.id)] = t.vals.length - 1; }\n  return c.deleted ? 'deleted' : (row ? 'changed' : 'added');\n}\n\n// New photos (data URLs) are stored in Drive; the record keeps \"drive:<fileId>\". Photos not sent this time keep their old file.\nfunction photos_(store, id, imgs, prev) {\n  var out = {}, k;\n  for (k in prev) out[k] = prev[k];\n  var folder = null;\n  for (k in imgs) {\n    var v = String(imgs[k] || '');\n    if (v.indexOf('data:') !== 0) { if (v) out[k] = v; continue; }\n    if (!folder) { var it = DriveApp.getFoldersByName(PHOTOS); folder = it.hasNext() ? it.next() : DriveApp.createFolder(PHOTOS); }\n    var name = store + '-' + id + '-' + k + '.jpg', old = folder.getFilesByName(name);\n    while (old.hasNext()) old.next().setTrashed(true);\n    var file = folder.createFile(Utilities.newBlob(Utilities.base64Decode(v.split(',')[1]), 'image/jpeg', name));\n    out[k] = 'drive:' + file.getId();\n  }\n  return out;\n}\n\nfunction since_(cache, t) {\n  var out = [];\n  Object.keys(STORES).forEach(function (store) {\n    var tb = table_(cache, store), jsonCol = tb.width - 1;\n    for (var i = 1; i < tb.vals.length; i++) {\n      var r = tb.vals[i];\n      if (+r[2] <= t) continue;\n      var data = null;\n      try { data = r[jsonCol] ? JSON.parse(r[jsonCol]) : null; } catch (err) {}\n      out.push({ store: store, id: String(r[0]), updatedAt: +r[1], deleted: r[5] === 'YES', data: data });\n    }\n  });\n  return out;\n}\n\nfunction summary_(c) {\n  var d = c.data || {};\n  return [d.name, d.model, d.invoiceNo ? 'Inv ' + d.invoiceNo : '', d.chassis ? 'Ch ' + d.chassis : '', d.village, c.store === 'settings' ? 'next invoice ' + d.invNext : '']\n    .filter(function (x) { return x; }).join(' \u00b7 ').slice(0, 200);\n}\n\nfunction history_(n) {\n  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('History');\n  if (!sh || sh.getLastRow() < 2) return [];\n  var vals = sh.getDataRange().getValues().slice(1).slice(-n).reverse();\n  return vals.map(function (r) {\n    return { time: r[0] instanceof Date ? r[0].getTime() : +new Date(r[0]), person: r[1], device: r[2], action: r[3], what: r[4], id: r[5], details: r[6] };\n  });\n}\n";
+const SHEET_URL_RE=/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/;
+let CLOUD=null, _cloudRun=null, _cloudTimer=0, _cloudHello=true;
+const deviceName=()=>{ const u=navigator.userAgent; const os=/Android/.test(u)?'Android phone':/iPhone|iPad/.test(u)?'iPhone':/Windows/.test(u)?'Windows PC':/Mac OS/.test(u)?'Mac':/Linux/.test(u)?'Linux PC':'Device';
+  const br=/Edg\//.test(u)?'Edge':/Chrome\//.test(u)?'Chrome':/Firefox\//.test(u)?'Firefox':/Safari\//.test(u)?'Safari':''; return os+(br?' · '+br:''); };
+async function cloudLoad(){ CLOUD=(await DB.get('kv','cloud'))||null; if(CLOUD&&!CLOUD.url) CLOUD=null; cloudChip(); }
+function cloudChip(state,msg){ const b=$('#cloudChip'); if(!b) return; b.classList.toggle('hide',!CLOUD);
+  b.textContent={busy:'☁ Sending…',ok:'☁ Up to date',off:'☁ Offline',err:'⚠ Cloud'}[state||'ok']; if(msg) b.title=msg; }
+function cloudSoon(){ if(!CLOUD) return; clearTimeout(_cloudTimer); _cloudTimer=setTimeout(cloudSync,2500); }
+function cloudSync(){ if(!CLOUD) return Promise.resolve(); if(_cloudRun) return _cloudRun; _cloudRun=_cloudSync().finally(()=>{ _cloudRun=null; }); return _cloudRun; }
+async function cloudPost(body){ const r=await fetch(CLOUD.url,{method:'POST',body:JSON.stringify(body)}); if(!r.ok) throw new Error('sheet replied '+r.status); const j=await r.json(); if(!j.ok) throw new Error(j.error||'sheet error'); return j; }
+const photoSig = v => String(v).length+':'+String(v).slice(-24);
+async function _cloudSync(){
+  if(!navigator.onLine){ cloudChip('off','No internet — changes are kept on this device and saved when back online'); return; }
+  cloudChip('busy');
+  try{
+    const st=(await DB.get('kv','cloudstate'))||{id:'cloudstate',since:0,pushed:{},photos:{}}; st.photos=st.photos||{};
+    const tombs=(await DB.get('kv','tombs'))||{id:'tombs',list:{}};
+    const changes=[];
+    for(const s of CLOUD_STORES) for(const o of await DB.all(s)){ const k=s+'/'+o.id; if((o.updatedAt||0)<=(st.pushed[k]||0)) continue;
+      const d={...o}; delete d._saved; delete d._priceSrc;
+      if(s==='customers') d.imgs=Object.fromEntries(Object.entries(o.imgs||{}).filter(([ik,v])=>String(v).startsWith('data:') && st.photos[k+'/'+ik]!==photoSig(v))); else delete d.imgs;
+      changes.push({store:s,id:o.id,updatedAt:o.updatedAt||0,data:d}); }
+    const set=await DB.get('kv','settings'); if(set && (set.updatedAt||0)>(st.pushed['settings/settings']||0)) changes.push({store:'settings',id:'settings',updatedAt:set.updatedAt,data:set});
+    Object.entries(tombs.list).forEach(([k,t])=>{ const i=k.indexOf('/'); changes.push({store:k.slice(0,i),id:k.slice(i+1),updatedAt:t,deleted:true}); });
+    const j=await cloudPost({action:'sync',user:CLOUD.user||'Unknown (name not given)',device:CLOUD.device||deviceName(),hello:_cloudHello,since:st.since,changes});
+    _cloudHello=false;
+    for(const c of changes){ const k=c.store+'/'+c.id; st.pushed[k]=Math.max(st.pushed[k]||0,c.updatedAt);
+      if(c.deleted) delete tombs.list[k]; else if(c.store==='customers') Object.entries(c.data.imgs||{}).forEach(([ik,v])=>{ st.photos[k+'/'+ik]=photoSig(v); }); }
+    let got=0;
+    for(const c of j.changes||[]){ const k=c.store+'/'+c.id;
+      if(c.store==='settings' && c.data){ const loc=(await DB.get('kv','settings'))||{}; const theirs=c.updatedAt>(loc.updatedAt||0);
+        const inv=Math.max(parseInt(loc.invNext)||0, parseInt(c.data.invNext)||0);   // invoice numbers never go backwards
+        if(theirs || inv!==(parseInt(loc.invNext)||0)){ const m={...(theirs?c.data:loc),id:'settings',invNext:inv}; m.updatedAt=theirs&&inv===(parseInt(c.data.invNext)||0)?c.updatedAt:Date.now(); await DB.put('kv',m,true); await loadSettings(); got++; }
+        st.pushed[k]=Math.max(st.pushed[k]||0,c.updatedAt); continue; }
+      if(!CLOUD_STORES.includes(c.store)) continue;
+      const loc=await DB.get(c.store,c.id);
+      if(c.deleted){ if(loc && (loc.updatedAt||0)<=c.updatedAt){ await DB.del(c.store,c.id,true); got++; } }
+      else if(c.data && (!loc || c.updatedAt>(loc.updatedAt||0))){ const d=c.data;
+        const mine=Object.fromEntries(Object.entries((loc&&loc.imgs)||{}).filter(([,v])=>String(v).startsWith('data:')));
+        d.imgs={...(d.imgs||{}),...mine}; await DB.put(c.store,d,true); got++; }
+      st.pushed[k]=Math.max(st.pushed[k]||0,c.updatedAt); }
+    st.since=j.serverTime; await DB.put('kv',st,true); await DB.put('kv',tombs,true);
+    cloudChip('ok','Saved to the company sheet at '+new Date().toLocaleTimeString());
+    if(got && TAB!=='sale' && !$('#modal')) VIEWS[TAB]();
+  }catch(e){ console.warn(e); cloudChip('err','Could not reach the company sheet: '+e.message+' — data is safe on this device, will retry'); }
+}
+function askName(then){
+  modal('Welcome to Dealer Desk', `<p style="margin-top:0">This device saves to the company sheet. Please enter your name — it is shown in the company history next to what you do.</p>
+    <label>Your name</label><input id="nmIn" class="up" value="${esc(CLOUD&&CLOUD.user||'')}" placeholder="e.g. RAMESH" autocomplete="name">
+    <div class="row" style="margin-top:12px"><button class="btn pri" id="nmOk">Continue</button></div>`);
+  setTimeout(()=>$('#nmIn')&&$('#nmIn').focus(),50);
+  $('#nmOk').onclick=async()=>{ const n=U($('#nmIn').value).trim(); if(!n){ toast('Please type your name'); return; } CLOUD.user=n; await DB.put('kv',CLOUD,true); closeModal(); _cloudHello=true; cloudSync(); if(then) then(); };
+}
+const companyLink = () => location.origin+location.pathname+'#cloud='+encodeURIComponent(CLOUD.url);
+async function shareCompanyLink(){ const url=companyLink();
+  if(navigator.share){ try{ await navigator.share({title:'Dealer Desk',text:'Dealer Desk — company link (staff only, do not forward outside the company):',url}); return; }catch(e){} }
+  try{ await navigator.clipboard.writeText(url); toast('Company link copied — send it to staff on WhatsApp'); }catch(e){ prompt('Copy this company link:',url); } }
+async function cloudConnect(){
+  const url=$('#ccUrl').value.trim(), name=U($('#ccName').value).trim();
+  if(!SHEET_URL_RE.test(url)){ toast('Paste the Web app URL — it looks like https://script.google.com/macros/s/…/exec'); return; }
+  if(!name){ toast('Type your name'); return; }
+  $('#ccOk').disabled=true; $('#ccOk').textContent='Connecting…';
+  try{ const r=await fetch(url+'?action=ping'); const j=await r.json(); if(!j.ok||j.app!=='dealerdesk') throw new Error('that URL is not the Dealer Desk script');
+    CLOUD={id:'cloud',url,user:name,device:deviceName(),sheet:j.sheet,sheetUrl:j.sheetUrl}; await DB.put('kv',CLOUD,true);
+    await DB.put('kv',{id:'cloudstate',since:0,pushed:{},photos:{}},true); _cloudHello=true;
+    await cloudSync(); renderNav(); toast('Connected ✔ — all data on this device is now saved to the company sheet'); VIEWS.settings();
+  }catch(e){ toast('Could not connect: '+esc(e.message)); $('#ccOk').disabled=false; $('#ccOk').textContent='Connect'; }
+}
+async function cloudDisconnect(){ if(!confirm('Stop saving this device to the company sheet? (data already saved stays in the sheet)')) return;
+  await DB.del('kv','cloud',true); await DB.del('kv','cloudstate',true); CLOUD=null; cloudChip(); renderNav(); VIEWS.settings(); }
+function cloudCard(){
+  if(CLOUD) return `<div class="card"><h2>Company cloud (Google Sheet) <span class="chip">Connected</span></h2>
+    <p class="muted" style="margin-top:0">Everything saved on this device goes to the company sheet${CLOUD.sheet?` “${esc(CLOUD.sheet)}”`:''} and everything others save comes here. You are <b>${esc(CLOUD.user||'?')}</b> on <b>${esc(CLOUD.device||deviceName())}</b>.</p>
+    <div class="row"><button class="btn pri" onclick="shareCompanyLink()">📤 Share company link with staff</button><button class="btn" onclick="cloudSync().then(()=>toast('Up to date ✔'))">↻ Save / refresh now</button><button class="btn" onclick="go('history')">🕘 History</button>
+     <button class="btn" onclick="askName(()=>VIEWS.settings())">Change my name</button>${CLOUD.sheetUrl?`<a class="btn" href="${esc(CLOUD.sheetUrl)}" target="_blank" rel="noopener">Open sheet (owner)</a>`:''}<button class="btn ghost" onclick="cloudDisconnect()">Disconnect this device</button></div>
+    <p class="muted" style="margin-bottom:0">The company link opens the app already connected — share it only inside the company. Anyone with it can see and change the data.</p></div>`;
+  return `<div class="card"><h2>Company cloud (Google Sheet)</h2>
+    <p class="muted" style="margin-top:0">Save every sale, customer, stock and demo from all phones & PCs into one Google Sheet, with a history of who did what. Owner sets it up once:</p>
+    <ol class="muted" style="padding-left:18px;margin:0 0 10px">
+     <li>Create a new Google Sheet (e.g. “Dealer Desk Data”).</li>
+     <li>In the sheet: Extensions → Apps Script → delete what is there, paste the script (button below), Save.</li>
+     <li>Deploy → New deployment → Web app · Execute as <b>Me</b> · Who has access <b>Anyone</b> → Deploy → Authorize.</li>
+     <li>Copy the Web app URL, paste it here with your name, press Connect. Then share the company link with staff.</li></ol>
+    <div class="row" style="margin-bottom:10px"><button class="btn" onclick="navigator.clipboard.writeText(GAS).then(()=>toast('Script copied — paste it in Apps Script'),()=>{})">📋 Copy script</button><button class="btn" onclick="LAST_FILES=[];deliver(new Blob([GAS],{type:'text/plain'}),'Dealer Desk - Google Apps Script.gs')">⬇ Download script</button></div>
+    <div class="grid"><div class="full"><label>Web app URL</label><input id="ccUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></div>
+     <div><label>Your name</label><input id="ccName" class="up" placeholder="e.g. ROCKY"></div></div>
+    <div class="row" style="margin-top:12px"><button class="btn pri" id="ccOk" onclick="cloudConnect()">Connect</button></div></div>`;
+}
+
+/* ---------- History (company sheet) ---------- */
+VIEWS.history = async () => {
+  $('#main').innerHTML = `<div class="card"><h2>History <span class="muted">loading from the company sheet…</span></h2></div>`;
+  let h=[]; try{ h=(await cloudPost({action:'history',n:500})).history||[]; }catch(e){ $('#main').innerHTML=`<div class="card"><h2>History</h2><p class="muted">Could not load: ${esc(e.message)}. Check the internet connection.</p></div>`; return; }
+  const people={}; h.forEach(r=>{ const k=r.person+' · '+r.device; const p=people[k]||(people[k]={person:r.person,device:r.device,last:r.time,n:0}); p.n++; p.last=Math.max(p.last,r.time); });
+  const when=t=>{ const d=new Date(t); return d.toLocaleDateString('en-IN')+' '+d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}); };
+  $('#main').innerHTML = `<div class="card"><h2>Who uses the app <span class="muted">last 500 actions</span></h2><div class="tw"><table><thead><tr><th>Person</th><th>Device</th><th>Last seen</th><th>Actions</th></tr></thead><tbody>
+    ${Object.values(people).sort((a,b)=>b.last-a.last).map(p=>`<tr><td><b>${esc(p.person)}</b></td><td>${esc(p.device)}</td><td>${when(p.last)}</td><td>${p.n}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">Nobody yet.</td></tr>'}</tbody></table></div></div>
+   <div class="card"><h2>History <span class="row"><input class="search" placeholder="Search person, customer, invoice…" oninput="filterRows(this.value)"><button class="btn sm" onclick="VIEWS.history()">↻</button></span></h2>
+    <div class="tw"><table id="tbl"><thead><tr><th>When</th><th>Person</th><th>What happened</th><th>Details</th></tr></thead><tbody>
+    ${h.map(r=>`<tr><td>${when(r.time)}</td><td><b>${esc(r.person)}</b><div class="muted">${esc(r.device)}</div></td><td>${esc(r.action)}${r.what?' · '+esc({customers:'customer',sales:'sale',stock:'stock',demos:'demo',settings:'settings'}[r.what]||r.what):''}</td><td>${esc(r.details||'')}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">No history yet.</td></tr>'}
+    </tbody></table></div><p class="muted" style="margin-bottom:0">The full history is also in the “History” tab of the company Google Sheet.</p></div>`;
+};
 
 /* ---------- theme ---------- */
 function toggleTheme(){ const r=document.documentElement; const cur=r.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'); r.dataset.theme=cur==='dark'?'light':'dark'; try{localStorage.setItem('theme',r.dataset.theme)}catch(e){} }
@@ -11522,8 +11637,15 @@ try{ const t=localStorage.getItem('theme'); if(t) document.documentElement.datas
   try{ await DB.open(); }catch(e){ document.body.innerHTML='<p style="padding:20px">This browser blocked local storage. Open the file in Chrome or Edge.</p>'; return; }
   await loadSettings();
   try{ const d=await DB.get('kv','saveDir'); if(d&&d.h) SAVE_DIR=d.h; }catch(e){}
+  const link=location.hash.match(/^#cloud=(.+)$/);
+  if(link){ const url=decodeURIComponent(link[1]); if(SHEET_URL_RE.test(url)){ const c=(await DB.get('kv','cloud'))||{id:'cloud',device:deviceName()}; if(c.url!==url){ c.url=url; await DB.put('kv',c,true); await DB.put('kv',{id:'cloudstate',since:0,pushed:{},photos:{}},true); } }
+    history.replaceState(null,'',location.pathname+location.search); }
+  await cloudLoad();
+  setInterval(()=>{ if(document.visibilityState==='visible') cloudSync(); },60000);
+  addEventListener('online',()=>cloudSync()); document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') cloudSync(); });
   if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
   renderNav(); go('home');
+  if(CLOUD){ if(!CLOUD.user) askName(); else cloudSync(); }
 })();
 </script>
 </body>
