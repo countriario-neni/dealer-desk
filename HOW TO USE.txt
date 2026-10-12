@@ -34,6 +34,11 @@ DAILY FLOW (one entry -> all documents) - "New sale" walks you through 5 steps:
    list when tapped; you can also type anything that is not in the list.
    Type hypothecation bank (or CASH). Date defaults to today.
 4. Documents: each document shows "Ready" or what is missing -> Download,
+   The QUOTATION comes out as a PDF printed on your letterhead (same layout as your
+   example), ready to print / WhatsApp - no retyping. "Word" button gives the old .docx.
+   Signature & stamp: Settings -> "Upload signature & stamp" -> pick the file
+   "SIGNATURE AND STAMP - upload in Dealer Desk Settings.png" (in the PowerTrac Docx folder).
+   Do this once on each PC/phone; it stays only on that device (never put online).
    or "Generate all 3". (The buttons in the bottom bar work from any step.)
    - Invoice number is given automatically on the first invoice and saved.
    - GST split (2.5% + 2.5%) and amounts in words are calculated.

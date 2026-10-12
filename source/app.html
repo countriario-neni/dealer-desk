@@ -449,8 +449,8 @@ function drawCalc(){
 }
 function drawDocCards(){
   const card=(k,ic,t,sub)=>{ const miss=DOC_NEEDS[k].filter(f=>!val(f)).map(f=>FIELD_LABEL[f]||f);
-    return `<div class="doc"><b>${ic} ${t}</b><span class="muted">${sub}</span>${miss.length?`<span class="miss">Missing: ${esc(miss.join(', '))}</span>`:'<span class="ok">✓ Ready</span>'}<button class="btn ${miss.length?'':'pri'}" onclick="gen('${k}')">Download</button></div>`; };
-  $('#docCards').innerHTML = card('quote','📄','Quotation','Word (.docx)') + card('invoice','🧾','Tax invoice','Excel (.xlsx) · '+(val('invoiceNo')||'no. '+S.invPrefix+S.invNext+' will be assigned')) + card('tr','📋','TR format + Check list','Excel (.xlsx)');
+    return `<div class="doc"><b>${ic} ${t}</b><span class="muted">${sub}</span>${miss.length?`<span class="miss">Missing: ${esc(miss.join(', '))}</span>`:'<span class="ok">✓ Ready</span>'}<div class="row"><button class="btn ${miss.length?'':'pri'}" style="flex:1" onclick="gen('${k}')">Download</button>${k==='quote'?`<button class="btn" onclick="gen('quoteDocx')" title="Word version">Word</button>`:''}</div></div>`; };
+  $('#docCards').innerHTML = card('quote','📄','Quotation','PDF on your letterhead (Word also available)') + card('invoice','🧾','Tax invoice','Excel (.xlsx) · '+(val('invoiceNo')||'no. '+S.invPrefix+S.invNext+' will be assigned')) + card('tr','📋','TR format + Check list','Excel (.xlsx)');
 }
 /* Places: remembered from saved customers (offline), so a known village fills its mandal, district & PIN. */
 let PLACES={village:{},mandal:{}}, PIN_VILLAGES=[];
@@ -746,6 +746,56 @@ function docx(tplKey,data){
 async function xlsxBlob(wb){ const buf=await wb.xlsx.writeBuffer(); return new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); }
 function calc(s){ const price=num(s.price); const g=num(S.gst)||5; const taxable=r2(price/(1+g/100)); const half=g/2; const cg=taxable*half/100; return {price,g,half,taxable,cg,sg:cg,tax:cg*2,total:taxable+cg*2}; }
 
+/* Quotation as PDF on the dealer letterhead (scanned A4 page = background), laid out like the owner's example.
+   pdf-lib (github.com/Hopding/pdf-lib) + Carlito Bold (OFL; same metrics as Calibri used in the original).
+   Positions are PDF points measured from the top of the page (baselines), taken from the example scan. */
+async function genQuotePdf(s){
+  const {PDFDocument, rgb} = PDFLib;
+  const pdf = await PDFDocument.load(b64ToBytes(TPL.letterhead)); pdf.registerFontkit(fontkit);
+  const F = await pdf.embedFont(b64ToBytes(TPL.font), {features:{liga:false,clig:false,calt:false}}); /* full embed (subsetting drops glyphs); no ligatures (they mis-space "ti") */ const pg = pdf.getPage(0), H = pg.getHeight(), ink = rgb(0,0,0);
+  const W = (t,sz=11) => F.widthOfTextAtSize(String(t),sz);
+  const fit = (t,maxW,sz=11) => Math.min(sz, sz*maxW/Math.max(1,W(t,sz)));
+  const T = (t,x,base,sz=11) => { t=String(t??''); if(t) pg.drawText(t,{x,y:H-base,size:sz,font:F,color:ink}); };
+  const dn = U(S.dealerName), amt1 = num(s.price), amt2 = num(s.item2amt), has2 = !!s.item2, tot = amt1+(has2?amt2:0);
+  T('QUOTATION', 285-W('QUOTATION',20)/2, 158.6, 20);
+  T('DATE : '+fmtD(s.quoteDate||today()), 415, 184.7);
+  [['NAME',s.name],[s.rel||'S/O',s.careOf],['VILLAGE',s.village],['MANDAL',s.mandal],['DISTRICT',s.district]].forEach(([l,v],i)=>{
+    const b=208.4+i*22.55, x=112+W(':-  '); v=U(v); T(l,62,b); T(':-',112,b); T(v,x,b,fit(v,530-x)); });
+  T('MOBILE NO :- '+(s.mobile||''), 62, 321.1);
+  T('Dear Sir / Madam,', 126, 369);
+  // justified paragraph: first line indented, last line ragged
+  const words=`SUB :- QUATATION FOR THE SUPPLY OF KUBOTA UNIT/SPARE THANK YOU FOR THE INTEREST IN ${dn} , WITH REFERENCE TO OUR CONVERSATION PLEASE BE INFORMED THAT A QUOTATION HAS BEEN ENCLOSED HERE FOR YOUR KIND REFERENCE.`.split(/\s+/);
+  const lines=[]; let cur=[], lx=78; const R=501; /* like Word: a line may fill up to the margin before wrapping, then is justified to it */
+  for(const w of words){ if(cur.length && lx+W([...cur,w].join(' '))>R+6){ lines.push([cur,lx]); cur=[]; lx=63; } cur.push(w); } lines.push([cur,lx]);
+  lines.forEach(([ws,x],i)=>{ const b=394.8+i*14.6; if(i<lines.length-1 && ws.length>1){ const gap=(R-x-W(ws.join('')))/(ws.length-1); ws.forEach(w=>{ T(w,x,b); x+=W(w)+gap; }); } else T(ws.join(' '),x,b); });
+  const hyp=(!s.hyp||U(s.hyp)==='CASH')?'NIL (CASH)':U(s.hyp); const hb=Math.max(447.1, 394.8+lines.length*14.6+8);
+  T('HYPOTHICATION:- '+hyp, 63, hb, fit('HYPOTHICATION:- '+hyp, 466-63));
+  // table
+  const xs=[57.2,93,253.8,303.5,381.4,466.2], ys=[451.1,477.4,503.6,529.5,554.6].map(y=>y+hb-447.1);
+  ys.forEach(y=>pg.drawLine({start:{x:xs[0],y:H-y},end:{x:xs[5],y:H-y},thickness:0.75,color:ink}));
+  xs.forEach(x=>pg.drawLine({start:{x,y:H-ys[0]},end:{x,y:H-ys[4]},thickness:0.75,color:ink}));
+  const row=(cells,b)=>cells.forEach((c,i)=>{ if(c==null||c==='') return; const x=xs[i]+7, w=xs[i+1]-x-4; T(c,x,b,fit(c,w)); });
+  const tb=ys[0]+10.3;
+  row(['SNO','PARTICULERS','QTY','RATE','AMOUNT'], tb);
+  row(['1',U(s.model),'1',inrQ(amt1),inrQ(amt1)], tb+25.9);
+  if(has2) row(['2',U(s.item2),'1',inrQ(amt2),inrQ(amt2)], tb+52.1);
+  row(['','','','',inrQ(tot)], tb+78.1);
+  // amount in words stays left of the signature/stamp (x≈330); wraps to a 2nd line if needed
+  const tl=[]; for(const w of ('TOWARDS:- '+rupeeWords(tot,'q')).split(' ')){ const l=tl.length?tl[tl.length-1]+' '+w:w; if(tl.length && W(l)>(tl.length>1?247:267)) tl.push(w); else tl[Math.max(0,tl.length-1)]=l; }
+  tl.slice(0,2).forEach((l,i)=>T(l, 63, ys[4]+25.6+i*14.4, fit(l, i?247:267)));
+  if(tl.length>2) T(tl.slice(2).join(' '), 63, ys[4]+25.6+28.8, fit(tl.slice(2).join(' '),247));
+  T('For '+dn, 316, ys[4]+49.4, fit('For '+dn, 560-316));
+  const sig=await DB.get('kv','signature');
+  if(sig && sig.png && S.pdfSign!==false){ const im=await pdf.embedPng(b64ToBytes(sig.png.split(',')[1])); const k=Math.min(150/im.width, 92/im.height);
+    pg.drawImage(im,{x:402-im.width*k/2, y:H-(ys[4]+40.4)-im.height*k/2, width:im.width*k, height:im.height*k}); }
+  [['1.','Price of Unit/spare are label'],['2.','Changed without NOTICE and chargeable at prevailing at the time of delivery.'],['3.','Delivery Unit/spare will be ex-show room.'],
+   ['4.','Delivery of according to the availability and against full payment by cash/Demand Draft on'],['','Any Nationalized bank payable at in favour of '+dn+'.']]
+   .forEach(([n,t],i)=>{ const b=ys[4]+97.6+i*14.4; T(n,82,b); T(t,100,b,fit(t,560-100)); });
+  T('Authorised Dealer', 64, ys[4]+178.3); T('KRISHNA ESCORT Kubota Agricultural Machinery India Private Limited.', 67, ys[4]+191.9);
+  pdf.setTitle('Quotation - '+U(s.name)); pdf.setAuthor(dn); pdf.setCreator('Dealer Desk');
+  s.d_quote=true;
+  return deliver(new Blob([await pdf.save()],{type:'application/pdf'}), safeName(`Quotation - ${s.name} - ${fmtD(s.quoteDate||today(),'-')}.pdf`));
+}
 async function genQuote(s){
   const amt1=num(s.price), amt2=num(s.item2amt); const tot=amt1+(s.item2?amt2:0);
   const blob=docx('quotation',{date:fmtD(s.quoteDate||today()), name:U(s.name), rel:s.rel||'S/O', care_of:U(s.careOf), village:U(s.village), mandal:U(s.mandal), district:U(s.district), mobile:s.mobile||'',
@@ -818,7 +868,8 @@ async function gen(kind){
   readForm(); LAST_FILES=[];
   if(!CUR.name){ toast('Enter customer name first'); return; }
   try{
-    if(kind==='quote'||kind==='all') await genQuote(CUR);
+    if(kind==='quote'||kind==='all') await genQuotePdf(CUR);
+    if(kind==='quoteDocx') await genQuote(CUR);
     if(kind==='invoice'||kind==='all') await genInvoice(CUR);
     if(kind==='tr'||kind==='all') await genTR(CUR);
     DOCS.forEach(([k])=>{ const cb=$(`[data-f="${k}"]`); if(cb) cb.checked=!!CUR[k]; });
@@ -952,6 +1003,11 @@ VIEWS.settings = async () => {
    <textarea id="st_banks" rows="5">${esc(S.banks.join('\n'))}</textarea>
    <div class="row" style="margin-top:8px"><input id="ifsc" placeholder="Look up IFSC (e.g. UTIB0000001)" style="max-width:260px" class="up"><button class="btn sm" onclick="ifscLookup()">Find bank</button><span id="ifscOut" class="muted"></span></div>
    <div class="row" style="margin-top:8px"><button class="btn pri" onclick="saveSt()">Save</button></div></div>
+  <div class="card"><h2>Signature & stamp on PDF quotation</h2>
+   <p class="muted" style="margin-top:0">Upload a picture of your signature + stamp (PNG with clear background works best). It is kept only on this device and printed above “For ${esc(U(S.dealerName))}” on every PDF quotation.</p>
+   <div class="row"><img id="sigPrev" alt="" style="max-height:80px;max-width:220px;background:#fff;border:1px solid var(--line);border-radius:8px;display:none">
+    <button class="btn" onclick="uploadSig()">⬆ Upload signature & stamp</button><button class="btn ghost" id="sigDel" onclick="removeSig()" style="display:none">Remove</button>
+    <label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" style="width:auto;min-height:0" ${S.pdfSign!==false?'checked':''} onchange="S.pdfSign=this.checked;saveSettings()"> Print on quotation</label></div></div>
   <div class="card"><h2>Save location (PC)</h2>
    <p class="muted">By default files go to your Downloads folder. On a PC in Chrome/Edge you can choose a folder (e.g. Documents\\PowerTrac Docx\\Generated) and files will be saved there directly.</p>
    <div class="row"><button class="btn" onclick="chooseDir()">Choose folder</button><span class="muted" id="dirName">${SAVE_DIR?'Using: '+esc(SAVE_DIR.name):'Downloads (default)'}</span></div></div>
@@ -960,12 +1016,16 @@ VIEWS.settings = async () => {
    <div class="row"><button class="btn pri" onclick="backup()">⬇ Backup (.json)</button><button class="btn" onclick="restore()">⬆ Restore</button><button class="btn ghost" onclick="wipe()">Erase all data</button></div></div>
   <div class="card"><h2>Integrations</h2>
    <p class="muted" style="margin:0">• IFSC lookup above uses the free open Razorpay IFSC service.<br>• SBI / bank loan APIs: no public free API exists for dealers; this slot is ready if your bank gives you API access (YONO / DSA portal).<br>• Next ideas: WhatsApp share (works now via Share button on phone), Google Drive backup, GST e-invoice.</p></div>`;
-  drawModels();
+  drawModels(); drawSig();
 };
 function drawModels(){ const Q=U($('#mfilter')?.value||'');
   const rows=S.models.map((m,i)=>[m,i]).filter(([m])=>!Q||U(m.name+' '+(m.hp||'')).includes(Q)).sort(([a],[b])=>(BRANDS.indexOf(a.brand)+1||9)-(BRANDS.indexOf(b.brand)+1||9)||(a.hp||0)-(b.hp||0));
   $('#models').innerHTML=rows.map(([m,i])=>`<div class="row" style="margin-bottom:6px">${m.cat?`<div style="flex:2;min-width:170px"><b style="font-size:13px">${esc(m.name)}</b><div class="muted">${m.hp} HP · ${m.drive}${m.ref?` · ~₹${lakh(m.ref[0])}–${lakh(m.ref[1])}`:''}</div></div>`:`<input class="up" style="flex:2;min-width:160px" value="${esc(m.name)}" placeholder="Model name" onchange="S.models[${i}].name=this.value.toUpperCase();S.models[${i}].brand=brandOf(this.value)">`}<input inputmode="decimal" style="flex:1;min-width:110px" value="${money(m.price||'')}" placeholder="Your price ₹" onchange="S.models[${i}].price=num(this.value);this.value=money(this.value)">${m.cat?'':`<button class="btn sm ghost" onclick="S.models.splice(${i},1);drawModels()">✕</button>`}</div>`).join('')
    +`<div class="actionbar" style="position:sticky;margin:8px -14px -14px;border-radius:0 0 var(--radius) var(--radius)"><button class="btn pri" onclick="saveSettings().then(()=>toast('Models & prices saved ✔'))">💾 Save models & prices</button></div>`; }
+async function drawSig(){ const s=await DB.get('kv','signature'), im=$('#sigPrev'); if(!im) return; im.style.display=s?'':'none'; $('#sigDel').style.display=s?'':'none'; if(s) im.src=s.png; }
+async function uploadSig(){ const f=await pickFile(); if(!f) return; try{ const img=await loadImg(f); const c=toCanvas(img,900);
+  await DB.put('kv',{id:'signature',png:c.toDataURL('image/png')}); drawSig(); toast('Signature & stamp saved on this device ✔'); }catch(e){ toast('Could not read that image'); } }
+async function removeSig(){ await DB.del('kv','signature'); drawSig(); }
 async function saveSt(){ ['dealerName','gstin','phone','email','addr1','addr2','invPrefix','hsn'].forEach(k=>S[k]=$('#st_'+k).value.trim()); S.defDistrict=U($('#st_defDistrict').value); S.invNext=parseInt($('#st_invNext').value)||S.invNext; S.gst=num($('#st_gst').value)||5; S.banks=$('#st_banks').value.split('\n').map(x=>x.trim().toUpperCase()).filter(Boolean); await saveSettings(); toast('Settings saved ✔'); }
 async function ifscLookup(){ const c=$('#ifsc').value.trim().toUpperCase(); if(!c) return; $('#ifscOut').textContent='Looking up…'; try{ const r=await fetch('https://ifsc.razorpay.com/'+c); if(!r.ok) throw 0; const j=await r.json(); $('#ifscOut').textContent=`${j.BANK}, ${j.BRANCH}, ${j.CITY}`; const name=U(j.BANK); const ta=$('#st_banks'); if(!ta.value.toUpperCase().includes(name)) ta.value=name+'\n'+ta.value; }catch(e){ $('#ifscOut').textContent='Not found / offline'; } }
 async function chooseDir(){ if(!window.showDirectoryPicker){ toast('Folder saving works in Chrome/Edge on PC. On phone, files go to Downloads.'); return; } try{ SAVE_DIR=await showDirectoryPicker({mode:'readwrite'}); await DB.put('kv',{id:'saveDir',h:SAVE_DIR}); $('#dirName').textContent='Using: '+SAVE_DIR.name; }catch(e){} }
